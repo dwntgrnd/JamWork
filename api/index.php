@@ -2,7 +2,11 @@
 
 require __DIR__ . '/vendor/autoload.php';
 
+date_default_timezone_set('UTC');
+
 use Dotenv\Dotenv;
+use JamWork\Middleware\RateLimitMiddleware;
+use JamWork\Routes\AuthRoutes;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Factory\AppFactory;
@@ -17,6 +21,7 @@ $app->setBasePath('/api');
 
 // Middleware stack (executes bottom-to-top)
 $app->addBodyParsingMiddleware();
+$app->add(RateLimitMiddleware::generalLimiter());
 $app->addRoutingMiddleware();
 
 // Error middleware — always return JSON
@@ -38,5 +43,7 @@ $app->get('/health', function (Request $request, Response $response) {
     $response->getBody()->write($payload);
     return $response->withHeader('Content-Type', 'application/json');
 });
+
+AuthRoutes::register($app);
 
 $app->run();
