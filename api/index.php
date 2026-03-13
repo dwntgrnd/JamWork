@@ -6,7 +6,9 @@ date_default_timezone_set('UTC');
 
 use Dotenv\Dotenv;
 use JamWork\Middleware\RateLimitMiddleware;
+use JamWork\Routes\AdminRoutes;
 use JamWork\Routes\AuthRoutes;
+use JamWork\Routes\WorkspaceSettingsRoutes;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Factory\AppFactory;
@@ -45,5 +47,7 @@ $app->get('/health', function (Request $request, Response $response) {
 });
 
 AuthRoutes::register($app);
+AdminRoutes::register($app);
+WorkspaceSettingsRoutes::register($app);
 
 $app->run();

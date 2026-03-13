@@ -24,3 +24,6 @@ npm-debug.log*
 
 # PHP
 api/vendor/
+
+# Docker
+docker-compose.override.yml
