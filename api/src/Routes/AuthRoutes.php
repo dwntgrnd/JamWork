@@ -25,8 +25,8 @@ class AuthRoutes
 
                 $errors = Validator::validate($data, [
                     'email' => 'required|email',
-                    'password' => 'required|min:8',
-                    'displayName' => 'required|min:1|max:255',
+                    'password' => 'required|min:10',
+                    'displayName' => 'required|min:1|max:100',
                 ]);
 
                 if (!empty($errors)) {
@@ -184,7 +184,7 @@ class AuthRoutes
                 $data = $request->getParsedBody() ?? [];
 
                 $errors = Validator::validate($data, [
-                    'newPassword' => 'required|min:8',
+                    'newPassword' => 'required|min:10',
                 ]);
 
                 if (!empty($errors)) {
@@ -228,7 +228,7 @@ class AuthRoutes
 
                 $errors = Validator::validate($data, [
                     'email' => 'optional|email',
-                    'displayName' => 'optional|min:1|max:255',
+                    'displayName' => 'optional|min:1|max:100',
                 ]);
 
                 if (!empty($errors)) {
@@ -307,7 +307,7 @@ class AuthRoutes
 
                 $errors = Validator::validate($data, [
                     'currentPassword' => 'required',
-                    'newPassword' => 'required|min:8',
+                    'newPassword' => 'required|min:10',
                 ]);
 
                 if (!empty($errors)) {
@@ -357,7 +357,7 @@ class AuthRoutes
                     'email' => $u['email'],
                     'displayName' => $u['display_name'],
                     'role' => $u['role'],
-                    'createdAt' => $u['created_at'],
+                    'createdAt' => date('c', strtotime($u['created_at'])),
                 ], $users);
 
                 $response->getBody()->write(json_encode(['users' => $mapped]));
