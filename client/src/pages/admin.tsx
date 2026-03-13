@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '@/hooks/use-auth';
-import { AuthGuard } from '@/components/auth-guard';
 import { User } from '@/types';
 import { apiPost, apiGet, apiPut, apiDelete } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -295,11 +294,11 @@ export default function AdminPage() {
   }
 
   return (
-    <AuthGuard>
+    <>
       <div className="min-h-screen bg-background p-8">
         <div className="max-w-4xl mx-auto">
           <Link
-            href="/my-tasks"
+            to="/my-tasks"
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
@@ -618,6 +617,6 @@ export default function AdminPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AuthGuard>
+    </>
   );
 }
