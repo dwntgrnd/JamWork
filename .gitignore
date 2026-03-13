@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+client/node_modules/
+api/vendor/
+
+# Build output
+client/dist/
+
+# Environment files
+.env
+api/.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# PHP
+api/vendor/

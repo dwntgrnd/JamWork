@@ -1,0 +1,424 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-manrope);
+  --font-mono: ui-monospace, monospace;
+
+  /* Standard shadcn tokens */
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  /* JamWork accent tokens */
+  --color-interactive: var(--interactive);
+  --color-interactive-foreground: var(--interactive-foreground);
+  --color-emphasis: var(--emphasis);
+  --color-emphasis-foreground: var(--emphasis-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+
+  /* Avatar tokens */
+  --color-avatar-1: var(--avatar-1);
+  --color-avatar-2: var(--avatar-2);
+  --color-avatar-3: var(--avatar-3);
+  --color-avatar-4: var(--avatar-4);
+  --color-avatar-5: var(--avatar-5);
+  --color-avatar-6: var(--avatar-6);
+
+  /* Project bar token */
+  --color-project-bar: var(--project-bar);
+
+  /* Sprint lane tokens */
+  --color-sprint-lane-1: var(--sprint-lane-1);
+  --color-sprint-lane-2: var(--sprint-lane-2);
+  --color-sprint-lane-3: var(--sprint-lane-3);
+  --color-sprint-lane-4: var(--sprint-lane-4);
+  --color-sprint-lane-5: var(--sprint-lane-5);
+  --color-sprint-lane-6: var(--sprint-lane-6);
+
+  /* Header tokens */
+  --color-header: var(--header);
+  --color-header-foreground: var(--header-foreground);
+  --color-header-muted: var(--header-muted);
+
+  /* Status tokens */
+  --color-status-todo-bg: var(--status-todo-bg);
+  --color-status-todo-fg: var(--status-todo-fg);
+  --color-status-in_progress-bg: var(--status-in_progress-bg);
+  --color-status-in_progress-fg: var(--status-in_progress-fg);
+  --color-status-review-bg: var(--status-review-bg);
+  --color-status-review-fg: var(--status-review-fg);
+  --color-status-done-bg: var(--status-done-bg);
+  --color-status-done-fg: var(--status-done-fg);
+
+  /* Priority tokens */
+  --color-priority-urgent: var(--priority-urgent);
+  --color-priority-high: var(--priority-high);
+  --color-priority-medium: var(--priority-medium);
+  --color-priority-low: var(--priority-low);
+  /* Effort tokens */
+  --color-effort-1-bg: var(--effort-1-bg);
+  --color-effort-1-fg: var(--effort-1-fg);
+  --color-effort-2-bg: var(--effort-2-bg);
+  --color-effort-2-fg: var(--effort-2-fg);
+  --color-effort-4-bg: var(--effort-4-bg);
+  --color-effort-4-fg: var(--effort-4-fg);
+  --color-effort-8-bg: var(--effort-8-bg);
+  --color-effort-8-fg: var(--effort-8-fg);
+
+  /* Component surface tokens (replace dark: variants in shadcn primitives) */
+  --color-input-sheer: var(--input-sheer);
+  --color-input-sheer-hover: var(--input-sheer-hover);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-outline-hover: var(--outline-hover);
+  --color-ghost-hover: var(--ghost-hover);
+  --color-control-border: var(--control-border);
+  --color-destructive-ring: var(--destructive-ring);
+  --color-destructive-muted: var(--destructive-muted);
+  --color-destructive-focus: var(--destructive-focus);
+  --color-tab-text: var(--tab-text);
+  --color-tab-active-border: var(--tab-active-border);
+}
+
+/* Design Tokens - Light Mode */
+:root {
+  --radius: 0.25rem;
+
+  /* Surfaces — pure white content, faint warm-white cards */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.18 0.03 265);
+  --card: oklch(0.995 0.002 75);
+  --card-foreground: oklch(0.18 0.03 265);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.03 265);
+
+  /* Primary — deep navy */
+  --primary: oklch(0.22 0.04 265);
+  --primary-foreground: oklch(0.98 0 0);
+
+  /* Secondary/Muted/Accent — warm neutrals (hue 75) */
+  --secondary: oklch(0.96 0.005 75);
+  --secondary-foreground: oklch(0.22 0.04 265);
+  --muted: oklch(0.96 0.005 75);
+  --muted-foreground: oklch(0.50 0.010 75);
+  --accent: oklch(0.96 0.005 75);
+  --accent-foreground: oklch(0.22 0.04 265);
+
+  /* Destructive — coral */
+  --destructive: oklch(0.62 0.20 15);
+
+  /* Borders — warm gray */
+  --border: oklch(0.91 0.01 75);
+  --input: oklch(0.91 0.01 75);
+
+  /* Ring — teal */
+  --ring: oklch(0.76 0.13 192);
+
+  /* Component surface tokens */
+  --input-sheer: transparent;
+  --input-sheer-hover: transparent;
+  --surface-overlay: var(--background);
+  --outline-hover: var(--accent);
+  --ghost-hover: var(--accent);
+  --control-border: oklch(0.50 0.010 75 / 0.4);
+  --destructive-ring: oklch(0.62 0.20 15 / 0.2);
+  --destructive-muted: var(--destructive);
+  --destructive-focus: oklch(0.62 0.20 15 / 0.1);
+  --tab-text: oklch(0.18 0.03 265 / 0.6);
+  --tab-active-border: transparent;
+
+  /* Chart colors */
+  --chart-1: oklch(0.76 0.13 192);
+  --chart-2: oklch(0.72 0.15 60);
+  --chart-3: oklch(0.55 0.16 305);
+  --chart-4: oklch(0.82 0.16 80);
+  --chart-5: oklch(0.62 0.20 15);
+
+  /* Interactive accent pair */
+  --interactive: oklch(0.76 0.13 192);
+  --interactive-foreground: oklch(0.15 0.03 192);
+  --emphasis: oklch(0.72 0.15 60);
+  --emphasis-foreground: oklch(0.15 0.05 60);
+
+  /* Info/Warning */
+  --info: oklch(0.55 0.16 305);
+  --info-foreground: oklch(0.98 0 0);
+  --warning: oklch(0.82 0.16 80);
+  --warning-foreground: oklch(0.20 0.05 80);
+
+  /* Header chrome — dark navy */
+  --header: oklch(0.22 0.04 265);
+  --header-foreground: oklch(0.95 0.01 265);
+  --header-muted: oklch(0.70 0.02 265);
+
+  /* Sidebar count badge */
+  --sidebar-count-bg: oklch(1.00 0 0);
+  --sidebar-count-fg: oklch(0.40 0.01 265);
+
+  /* Sidebar — cool gray, navy-tinted */
+  --sidebar: oklch(0.94 0.015 265);
+  --sidebar-foreground: oklch(0.18 0.03 265);
+  --sidebar-primary: oklch(0.42 0.12 192);
+  --sidebar-primary-foreground: oklch(0.15 0.03 192);
+  --sidebar-accent: oklch(0.88 0.025 265);
+  --sidebar-accent-foreground: oklch(0.18 0.03 265);
+  --sidebar-border: oklch(0.88 0.015 265);
+  --sidebar-ring: oklch(0.76 0.13 192);
+
+  /* Status colors — ghost style (tinted bg + colored text) */
+  --status-todo-bg: oklch(0.92 0.01 265);
+  --status-todo-fg: oklch(0.45 0.03 265);
+  --status-in_progress-bg: oklch(0.93 0.04 192);
+  --status-in_progress-fg: oklch(0.42 0.12 192);
+  --status-review-bg: oklch(0.94 0.05 80);
+  --status-review-fg: oklch(0.45 0.10 80);
+  --status-done-bg: oklch(0.92 0.06 145);
+  --status-done-fg: oklch(0.38 0.14 145);
+
+  /* Priority dot colors — more saturated */
+  --priority-urgent: oklch(0.58 0.24 15);
+  --priority-high: oklch(0.65 0.20 60);
+  --priority-medium: oklch(0.75 0.18 80);
+  --priority-low: oklch(0.65 0.04 265);
+
+  /* Effort badge colors */
+  --effort-1-bg: oklch(0.96 0.005 75);
+  --effort-1-fg: oklch(0.50 0.010 75);
+  --effort-2-bg: oklch(0.92 0.03 192);
+  --effort-2-fg: oklch(0.35 0.08 192);
+  --effort-4-bg: oklch(0.93 0.04 80);
+  --effort-4-fg: oklch(0.40 0.08 80);
+  --effort-8-bg: oklch(0.92 0.04 305);
+  --effort-8-fg: oklch(0.40 0.10 305);
+
+  /* Success */
+  --success: oklch(0.65 0.17 160);
+  --success-foreground: oklch(0.15 0.05 160);
+
+  /* Avatar hue-spread */
+  --avatar-1: oklch(0.55 0.18 265);
+  --avatar-2: oklch(0.55 0.17 160);
+  --avatar-3: oklch(0.50 0.16 305);
+  --avatar-4: oklch(0.62 0.15 60);
+  --avatar-5: oklch(0.55 0.20 15);
+  --avatar-6: oklch(0.55 0.14 192);
+
+  /* Project bar */
+  --project-bar: oklch(0.72 0.15 60 / 0.4);
+
+  /* Sprint lane tints */
+  --sprint-lane-1: oklch(0.95 0.03 265 / 0.5);
+  --sprint-lane-2: oklch(0.95 0.03 160 / 0.5);
+  --sprint-lane-3: oklch(0.95 0.03 305 / 0.5);
+  --sprint-lane-4: oklch(0.95 0.03 60 / 0.5);
+  --sprint-lane-5: oklch(0.95 0.03 15 / 0.5);
+  --sprint-lane-6: oklch(0.95 0.03 192 / 0.5);
+
+  /* Overdue hatch pattern */
+  --overdue-hatch: repeating-linear-gradient(45deg, transparent, transparent 4px, oklch(0.62 0.20 15 / 0.3) 4px, oklch(0.62 0.20 15 / 0.3) 8px);
+
+  /* Shadows — navy-tinted */
+  --shadow-xs: 0 1px 2px oklch(0.22 0.04 265 / 0.04);
+  --shadow-sm: 0 1px 3px oklch(0.22 0.04 265 / 0.06), 0 1px 2px oklch(0.22 0.04 265 / 0.04);
+  --shadow-md: 0 4px 6px oklch(0.22 0.04 265 / 0.06), 0 2px 4px oklch(0.22 0.04 265 / 0.04);
+  --shadow-lg: 0 10px 15px oklch(0.22 0.04 265 / 0.08), 0 4px 6px oklch(0.22 0.04 265 / 0.04);
+  --shadow-header: 0 2px 8px oklch(0.22 0.04 265 / 0.12);
+}
+
+/* Design Tokens - Dark Mode */
+.dark {
+  /* Soft dark background */
+  --background: oklch(0.16 0.015 265);
+  --foreground: oklch(0.95 0 0);
+
+  /* Cards/popovers slightly lighter for depth */
+  --card: oklch(0.19 0.015 265);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.19 0.015 265);
+  --popover-foreground: oklch(0.95 0 0);
+
+  /* Primary — light for contrast on dark */
+  --primary: oklch(0.85 0 0);
+  --primary-foreground: oklch(0.16 0.015 265);
+
+  /* Secondary/Muted/Accent */
+  --secondary: oklch(0.22 0.015 265);
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.22 0.015 265);
+  --muted-foreground: oklch(0.65 0 0);
+  --accent: oklch(0.22 0.015 265);
+  --accent-foreground: oklch(0.95 0 0);
+
+  /* Destructive — coral (slightly brighter in dark) */
+  --destructive: oklch(0.65 0.22 15);
+
+  /* Borders — subtle but visible */
+  --border: oklch(0.30 0.015 265);
+  --input: oklch(0.30 0.015 265);
+
+  /* Ring — teal */
+  --ring: oklch(0.76 0.13 192);
+
+  /* Component surface tokens */
+  --input-sheer: oklch(0.30 0.015 265 / 0.3);
+  --input-sheer-hover: oklch(0.30 0.015 265 / 0.5);
+  --surface-overlay: oklch(0.30 0.015 265 / 0.3);
+  --outline-hover: oklch(0.30 0.015 265 / 0.5);
+  --ghost-hover: oklch(0.22 0.015 265 / 0.5);
+  --control-border: oklch(0.65 0 0 / 0.5);
+  --destructive-ring: oklch(0.65 0.22 15 / 0.4);
+  --destructive-muted: oklch(0.65 0.22 15 / 0.6);
+  --destructive-focus: oklch(0.65 0.22 15 / 0.2);
+  --tab-text: var(--muted-foreground);
+  --tab-active-border: var(--input);
+
+  /* Chart colors */
+  --chart-1: oklch(0.76 0.13 192);
+  --chart-2: oklch(0.72 0.15 60);
+  --chart-3: oklch(0.60 0.16 305);
+  --chart-4: oklch(0.82 0.16 80);
+  --chart-5: oklch(0.65 0.22 15);
+
+  /* Interactive accent pair */
+  --interactive: oklch(0.76 0.13 192);
+  --interactive-foreground: oklch(0.15 0.03 192);
+  --emphasis: oklch(0.72 0.15 60);
+  --emphasis-foreground: oklch(0.15 0.05 60);
+
+  /* Info/Warning */
+  --info: oklch(0.60 0.16 305);
+  --info-foreground: oklch(0.95 0 0);
+  --warning: oklch(0.82 0.16 80);
+  --warning-foreground: oklch(0.20 0.05 80);
+
+  /* Header chrome — darkest layer */
+  --header: oklch(0.14 0.02 265);
+  --header-foreground: oklch(0.92 0.01 265);
+  --header-muted: oklch(0.60 0.02 265);
+
+  /* Sidebar count badge */
+  --sidebar-count-bg: oklch(0.25 0.01 265);
+  --sidebar-count-fg: oklch(0.85 0 0);
+
+  /* Sidebar — darkest surface */
+  --sidebar: oklch(0.12 0.015 265);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: oklch(0.76 0.13 192);
+  --sidebar-primary-foreground: oklch(0.95 0 0);
+  --sidebar-accent: oklch(0.20 0.020 265);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.25 0.015 265);
+  --sidebar-ring: oklch(0.76 0.13 192);
+
+  /* Status colors — ghost style (dark) */
+  --status-todo-bg: oklch(0.22 0.01 265);
+  --status-todo-fg: oklch(0.70 0.02 265);
+  --status-in_progress-bg: oklch(0.22 0.04 192);
+  --status-in_progress-fg: oklch(0.75 0.12 192);
+  --status-review-bg: oklch(0.24 0.04 80);
+  --status-review-fg: oklch(0.78 0.12 80);
+  --status-done-bg: oklch(0.22 0.05 145);
+  --status-done-fg: oklch(0.75 0.14 145);
+
+  /* Priority dot colors — more saturated (dark) */
+  --priority-urgent: oklch(0.62 0.24 15);
+  --priority-high: oklch(0.68 0.20 60);
+  --priority-medium: oklch(0.78 0.18 80);
+  --priority-low: oklch(0.55 0.04 265);
+
+  /* Effort badge colors (dark) */
+  --effort-1-bg: oklch(0.25 0.01 265);
+  --effort-1-fg: oklch(0.70 0.01 265);
+  --effort-2-bg: oklch(0.25 0.04 192);
+  --effort-2-fg: oklch(0.75 0.10 192);
+  --effort-4-bg: oklch(0.28 0.04 80);
+  --effort-4-fg: oklch(0.78 0.10 80);
+  --effort-8-bg: oklch(0.25 0.05 305);
+  --effort-8-fg: oklch(0.75 0.12 305);
+
+  /* Success (dark) */
+  --success: oklch(0.70 0.14 160);
+  --success-foreground: oklch(0.15 0.05 160);
+
+  /* Avatar hue-spread (dark — slightly brighter) */
+  --avatar-1: oklch(0.60 0.16 265);
+  --avatar-2: oklch(0.60 0.15 160);
+  --avatar-3: oklch(0.55 0.14 305);
+  --avatar-4: oklch(0.65 0.13 60);
+  --avatar-5: oklch(0.60 0.18 15);
+  --avatar-6: oklch(0.60 0.12 192);
+
+  /* Project bar (dark) */
+  --project-bar: oklch(0.72 0.15 60 / 0.35);
+
+  /* Sprint lane tints (dark) */
+  --sprint-lane-1: oklch(0.25 0.03 265 / 0.3);
+  --sprint-lane-2: oklch(0.25 0.03 160 / 0.3);
+  --sprint-lane-3: oklch(0.25 0.03 305 / 0.3);
+  --sprint-lane-4: oklch(0.25 0.03 60 / 0.3);
+  --sprint-lane-5: oklch(0.25 0.03 15 / 0.3);
+  --sprint-lane-6: oklch(0.25 0.03 192 / 0.3);
+
+  /* Overdue hatch pattern (dark) */
+  --overdue-hatch: repeating-linear-gradient(45deg, transparent, transparent 4px, oklch(0.65 0.22 15 / 0.3) 4px, oklch(0.65 0.22 15 / 0.3) 8px);
+
+  /* Shadows — black in dark mode */
+  --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.15);
+  --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.2), 0 1px 2px oklch(0 0 0 / 0.15);
+  --shadow-md: 0 4px 6px oklch(0 0 0 / 0.2), 0 2px 4px oklch(0 0 0 / 0.15);
+  --shadow-lg: 0 10px 15px oklch(0 0 0 / 0.25), 0 4px 6px oklch(0 0 0 / 0.15);
+  --shadow-header: 0 2px 8px oklch(0 0 0 / 0.3);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
