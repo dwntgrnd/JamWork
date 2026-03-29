@@ -13,6 +13,7 @@ use JamWork\Routes\ProjectRoutes;
 use JamWork\Routes\LabelRoutes;
 use JamWork\Routes\MilestoneRoutes;
 use JamWork\Routes\TaskLinkRoutes;
+use JamWork\Routes\SprintRoutes;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Factory\AppFactory;
@@ -57,5 +58,6 @@ ProjectRoutes::register($app);
 LabelRoutes::register($app);
 MilestoneRoutes::register($app);
 TaskLinkRoutes::register($app);
+SprintRoutes::register($app);
 
 $app->run();
