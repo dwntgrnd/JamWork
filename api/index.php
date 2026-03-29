@@ -9,6 +9,10 @@ use JamWork\Middleware\RateLimitMiddleware;
 use JamWork\Routes\AdminRoutes;
 use JamWork\Routes\AuthRoutes;
 use JamWork\Routes\WorkspaceSettingsRoutes;
+use JamWork\Routes\ProjectRoutes;
+use JamWork\Routes\LabelRoutes;
+use JamWork\Routes\MilestoneRoutes;
+use JamWork\Routes\TaskLinkRoutes;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Factory\AppFactory;
@@ -49,5 +53,9 @@ $app->get('/health', function (Request $request, Response $response) {
 AuthRoutes::register($app);
 AdminRoutes::register($app);
 WorkspaceSettingsRoutes::register($app);
+ProjectRoutes::register($app);
+LabelRoutes::register($app);
+MilestoneRoutes::register($app);
+TaskLinkRoutes::register($app);
 
 $app->run();
