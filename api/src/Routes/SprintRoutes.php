@@ -5,6 +5,7 @@ namespace JamWork\Routes;
 use JamWork\Lib\Database;
 use JamWork\Lib\Validator;
 use JamWork\Middleware\AuthMiddleware;
+use JamWork\Models\TaskModel;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Ramsey\Uuid\Uuid;
@@ -62,27 +63,20 @@ class SprintRoutes
         $db = Database::getInstance();
 
         // Build IN clause for sprint IDs
-        $placeholders = [];
-        $params = [];
-        foreach ($sprintIds as $i => $sid) {
-            $key = "sid{$i}";
-            $placeholders[] = ":{$key}";
-            $params[$key] = $sid;
-        }
-        $inClause = implode(', ', $placeholders);
+        $in = TaskModel::buildInClause($sprintIds, 'sid');
 
-        // Step 1: Fetch base tasks
+        // Fetch base tasks
         $sql = "
             SELECT t.*,
                    p.id AS project_rel_id, p.name AS project_rel_name
             FROM tasks t
             LEFT JOIN projects p ON t.project_id = p.id
-            WHERE t.sprint_id IN ({$inClause})
+            WHERE t.sprint_id IN ({$in['clause']})
               AND t.deleted_at IS NULL
             ORDER BY t.sort_order ASC
         ";
         $stmt = $db->prepare($sql);
-        $stmt->execute($params);
+        $stmt->execute($in['params']);
         $taskRows = $stmt->fetchAll();
 
         $taskIds = array_column($taskRows, 'id');
@@ -97,161 +91,28 @@ class SprintRoutes
             return $result;
         }
 
-        // Build IN clause for task IDs
-        $taskPlaceholders = [];
-        $taskParams = [];
-        foreach ($taskIds as $i => $tid) {
-            $key = "tid{$i}";
-            $taskPlaceholders[] = ":{$key}";
-            $taskParams[$key] = $tid;
-        }
-        $taskInClause = implode(', ', $taskPlaceholders);
-
-        // Step 2: Fetch assignees
-        $sql = "
-            SELECT ta.task_id, ta.id, ta.user_id, ta.assigned_at,
-                   u.id AS user_id_rel, u.email AS user_email, u.display_name AS user_display_name
-            FROM task_assignees ta
-            JOIN users u ON ta.user_id = u.id
-            WHERE ta.task_id IN ({$taskInClause})
-        ";
-        $stmt = $db->prepare($sql);
-        $stmt->execute($taskParams);
-        $assigneeRows = $stmt->fetchAll();
-
-        $assigneesByTask = [];
-        foreach ($assigneeRows as $row) {
-            $assigneesByTask[$row['task_id']][] = [
-                'id' => $row['id'],
-                'taskId' => $row['task_id'],
-                'userId' => $row['user_id'],
-                'assignedAt' => date('c', strtotime($row['assigned_at'])),
-                'user' => [
-                    'id' => $row['user_id_rel'],
-                    'email' => $row['user_email'],
-                    'displayName' => $row['user_display_name'],
-                ],
-            ];
-        }
-
-        // Step 3: Fetch labels
-        $sql = "
-            SELECT tl.task_id, tl.id, tl.label_id,
-                   l.id AS label_id_rel, l.name AS label_name, l.color AS label_color,
-                   l.created_by_id AS label_created_by_id, l.created_at AS label_created_at
-            FROM task_labels tl
-            JOIN labels l ON tl.label_id = l.id
-            WHERE tl.task_id IN ({$taskInClause})
-        ";
-        $stmt = $db->prepare($sql);
-        $stmt->execute($taskParams);
-        $labelRows = $stmt->fetchAll();
-
-        $labelsByTask = [];
-        foreach ($labelRows as $row) {
-            $labelsByTask[$row['task_id']][] = [
-                'id' => $row['id'],
-                'taskId' => $row['task_id'],
-                'labelId' => $row['label_id'],
-                'label' => [
-                    'id' => $row['label_id_rel'],
-                    'name' => $row['label_name'],
-                    'color' => $row['label_color'],
-                    'createdById' => $row['label_created_by_id'],
-                    'createdAt' => date('c', strtotime($row['label_created_at'])),
-                ],
-            ];
-        }
-
-        // Step 4: Fetch subtasks (only if full)
-        $subtasksByTask = [];
+        // Fetch relations via TaskModel
+        $options = ['full' => $full];
         if ($full) {
-            $sql = "
-                SELECT s.id, s.title, s.completed, s.sort_order, s.task_id, s.created_at
-                FROM subtasks s
-                WHERE s.task_id IN ({$taskInClause})
-                ORDER BY s.sort_order ASC
-            ";
-            $stmt = $db->prepare($sql);
-            $stmt->execute($taskParams);
-            $subtaskRows = $stmt->fetchAll();
-
-            foreach ($subtaskRows as $row) {
-                $subtasksByTask[$row['task_id']][] = [
-                    'id' => $row['id'],
-                    'title' => $row['title'],
-                    'completed' => (bool) $row['completed'],
-                    'sortOrder' => (int) $row['sort_order'],
-                    'taskId' => $row['task_id'],
-                    'createdAt' => date('c', strtotime($row['created_at'])),
-                ];
-            }
+            $options['creatorIds'] = array_unique(array_column($taskRows, 'created_by_id'));
         }
+        $relations = TaskModel::fetchRelationsForTasks($taskIds, $options);
 
-        // Step 5: Fetch createdBy users (only if full)
-        $creatorsById = [];
-        if ($full) {
-            $creatorIds = array_unique(array_column($taskRows, 'created_by_id'));
-            $creatorPlaceholders = [];
-            $creatorParams = [];
-            foreach (array_values($creatorIds) as $i => $uid) {
-                $key = "uid{$i}";
-                $creatorPlaceholders[] = ":{$key}";
-                $creatorParams[$key] = $uid;
-            }
-            $creatorInClause = implode(', ', $creatorPlaceholders);
-
-            $sql = "SELECT id, email, display_name FROM users WHERE id IN ({$creatorInClause})";
-            $stmt = $db->prepare($sql);
-            $stmt->execute($creatorParams);
-            $creatorRows = $stmt->fetchAll();
-
-            foreach ($creatorRows as $row) {
-                $creatorsById[$row['id']] = [
-                    'id' => $row['id'],
-                    'email' => $row['email'],
-                    'displayName' => $row['display_name'],
-                ];
-            }
-        }
-
-        // Step 6: Assemble task objects and group by sprint
+        // Assemble and group by sprint
         foreach ($taskRows as $row) {
             $taskId = $row['id'];
             $sprintId = $row['sprint_id'];
 
-            $task = [
-                'id' => $taskId,
-                'title' => $row['title'],
-                'description' => $row['description'],
-                'notes' => $row['notes'],
-                'status' => $row['status'],
-                'priority' => $row['priority'],
-                'effort' => $row['effort'] !== null ? (int) $row['effort'] : null,
-                'dueDate' => $row['due_date'] ? date('c', strtotime($row['due_date'])) : null,
-                'startDate' => $row['start_date'] ? date('c', strtotime($row['start_date'])) : null,
-                'sortOrder' => (int) $row['sort_order'],
-                'recurrence' => $row['recurrence'],
-                'sprintId' => $row['sprint_id'],
-                'inSprintBacklog' => (bool) $row['in_sprint_backlog'],
-                'projectId' => $row['project_id'],
-                'createdById' => $row['created_by_id'],
-                'createdAt' => date('c', strtotime($row['created_at'])),
-                'updatedAt' => date('c', strtotime($row['updated_at'])),
-                'project' => $row['project_rel_id'] ? [
-                    'id' => $row['project_rel_id'],
-                    'name' => $row['project_rel_name'],
-                ] : null,
-                'assignees' => $assigneesByTask[$taskId] ?? [],
-                'labels' => $labelsByTask[$taskId] ?? [],
+            $taskRelations = [
+                'assignees' => $relations['assignees'][$taskId] ?? [],
+                'labels' => $relations['labels'][$taskId] ?? [],
             ];
-
             if ($full) {
-                $task['subtasks'] = $subtasksByTask[$taskId] ?? [];
-                $task['creator'] = $creatorsById[$row['created_by_id']] ?? null;
+                $taskRelations['subtasks'] = $relations['subtasks'][$taskId] ?? [];
+                $taskRelations['creator'] = $relations['creators'][$row['created_by_id']] ?? null;
             }
 
-            $result[$sprintId][] = $task;
+            $result[$sprintId][] = TaskModel::mapTask($row, $taskRelations, $full);
         }
 
         return $result;
@@ -475,25 +336,7 @@ class SprintRoutes
                 }
 
                 $mappedTasks = array_map(function ($row) {
-                    return [
-                        'id' => $row['id'],
-                        'title' => $row['title'],
-                        'description' => $row['description'],
-                        'notes' => $row['notes'],
-                        'status' => $row['status'],
-                        'priority' => $row['priority'],
-                        'effort' => $row['effort'] !== null ? (int) $row['effort'] : null,
-                        'dueDate' => $row['due_date'] ? date('c', strtotime($row['due_date'])) : null,
-                        'startDate' => $row['start_date'] ? date('c', strtotime($row['start_date'])) : null,
-                        'sortOrder' => (int) $row['sort_order'],
-                        'recurrence' => $row['recurrence'],
-                        'sprintId' => $row['sprint_id'],
-                        'inSprintBacklog' => (bool) $row['in_sprint_backlog'],
-                        'projectId' => $row['project_id'],
-                        'createdById' => $row['created_by_id'],
-                        'createdAt' => date('c', strtotime($row['created_at'])),
-                        'updatedAt' => date('c', strtotime($row['updated_at'])),
-                    ];
+                    return TaskModel::mapTask($row, [], false);
                 }, $incompleteTasks);
 
                 $response->getBody()->write(json_encode([
