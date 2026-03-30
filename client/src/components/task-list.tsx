@@ -132,9 +132,11 @@ export function TaskList({
     }
   };
 
-  const fetchTasks = async () => {
+  const fetchTasks = async (options?: { silent?: boolean }) => {
     try {
-      setLoading(true);
+      if (!options?.silent) {
+        setLoading(true);
+      }
 
       // Build query params
       const params = new URLSearchParams();
@@ -152,7 +154,9 @@ export function TaskList({
     } catch (err) {
       console.error('Failed to fetch tasks:', err);
     } finally {
-      setLoading(false);
+      if (!options?.silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -266,14 +270,16 @@ export function TaskList({
 
       // If a recurring task was marked done and cloned, refresh to show the new task
       if (result.clonedTask) {
-        await fetchTasks();
+        await fetchTasks({ silent: true });
       } else {
-        // Update local state optimistically
+        // Optimistic update for instant visual feedback
         setTasks((prev) =>
           prev.map((task) =>
             task.id === taskId ? { ...task, [field]: value } : task
           )
         );
+        // Silent re-fetch to re-apply server-side filters and sort order
+        await fetchTasks({ silent: true });
       }
 
       // Show saved indicator briefly
