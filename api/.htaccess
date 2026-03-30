@@ -1,4 +1,32 @@
+# JamWork v2 — API .htaccess
+# Slim 4 routing + access hardening
+
+# ── Deny access to sensitive files ───────────────────────
+
+# Block dotenv files
+<FilesMatch "^\.env">
+    Require all denied
+</FilesMatch>
+
+# Block composer files
+<FilesMatch "^composer\.(json|lock)$">
+    Require all denied
+</FilesMatch>
+
+# Block .gitignore
+<FilesMatch "^\.gitignore$">
+    Require all denied
+</FilesMatch>
+
+# ── Deny access to sensitive directories ─────────────────
 RewriteEngine On
+
+# Block src/, migrations/, vendor/ directories
+RewriteRule ^src/ - [F,L]
+RewriteRule ^migrations/ - [F,L]
+RewriteRule ^vendor/ - [F,L]
+
+# ── Slim 4 front controller ─────────────────────────────
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [QSA,L]
