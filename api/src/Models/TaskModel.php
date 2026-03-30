@@ -78,7 +78,7 @@ class TaskModel
 
         if ($full) {
             $task['subtasks'] = $relations['subtasks'] ?? [];
-            $task['createdBy'] = $relations['creator'] ?? null;
+            $task['creator'] = $relations['creator'] ?? null;
         }
 
         if (isset($relations['links'])) {
@@ -134,7 +134,7 @@ class TaskModel
         // Assignees (always)
         $sql = "
             SELECT ta.task_id, ta.id, ta.user_id, ta.assigned_at,
-                   u.id AS user_id_rel, u.email AS user_email, u.display_name AS user_display_name
+                   u.id AS user_id_rel, u.email AS user_email, u.display_name AS user_display_name, u.role AS user_role
             FROM task_assignees ta
             JOIN users u ON ta.user_id = u.id
             WHERE ta.task_id IN ({$in['clause']})
@@ -153,6 +153,7 @@ class TaskModel
                     'id' => $row['user_id_rel'],
                     'email' => $row['user_email'],
                     'displayName' => $row['user_display_name'],
+                    'role' => $row['user_role'],
                 ],
             ];
         }
@@ -214,7 +215,7 @@ class TaskModel
             $creatorIds = array_unique($options['creatorIds'] ?? []);
             if (!empty($creatorIds)) {
                 $cIn = self::buildInClause(array_values($creatorIds), 'uid');
-                $sql = "SELECT id, email, display_name FROM users WHERE id IN ({$cIn['clause']})";
+                $sql = "SELECT id, email, display_name, role FROM users WHERE id IN ({$cIn['clause']})";
                 $stmt = $db->prepare($sql);
                 $stmt->execute($cIn['params']);
                 $rows = $stmt->fetchAll();
@@ -224,6 +225,7 @@ class TaskModel
                         'id' => $row['id'],
                         'email' => $row['email'],
                         'displayName' => $row['display_name'],
+                        'role' => $row['role'],
                     ];
                 }
             }
@@ -233,7 +235,7 @@ class TaskModel
         if ($includeLinks) {
             $sql = "
                 SELECT tl.id, tl.title, tl.url, tl.task_id, tl.created_by_id, tl.created_at,
-                       u.id AS user_id_rel, u.display_name AS user_display_name
+                       u.id AS user_id_rel, u.display_name AS user_display_name, u.role AS user_role
                 FROM task_links tl
                 JOIN users u ON tl.created_by_id = u.id
                 WHERE tl.task_id IN ({$in['clause']})
@@ -254,6 +256,7 @@ class TaskModel
                     'createdBy' => [
                         'id' => $row['user_id_rel'],
                         'displayName' => $row['user_display_name'],
+                        'role' => $row['user_role'],
                     ],
                 ];
             }

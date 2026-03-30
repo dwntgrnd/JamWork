@@ -33,6 +33,7 @@ class ProjectRoutes
             'endDate' => $row['end_date'] ? date('c', strtotime($row['end_date'])) : null,
             'createdAt' => date('c', strtotime($row['created_at'])),
             'updatedAt' => date('c', strtotime($row['updated_at'])),
+            'createdById' => $row['created_by_id'],
             'createdBy' => [
                 'id' => $row['creator_id'],
                 'email' => $row['creator_email'],
