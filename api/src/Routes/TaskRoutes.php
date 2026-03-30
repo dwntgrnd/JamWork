@@ -29,8 +29,224 @@ class TaskRoutes
 
             // ============================================================
             // STATIC ROUTES (must come before /{id} parameterized routes)
-            // CC10 will add: PUT /reorder, PUT /bulk-update, PATCH /bulk, POST /bulk-delete here
             // ============================================================
+
+            // PUT /tasks/reorder
+            $group->put('/reorder', function (Request $request, Response $response) {
+                $data = $request->getParsedBody() ?? [];
+
+                $errors = Validator::validate($data, [
+                    'taskIds' => 'required|uuid_array',
+                ]);
+
+                if (!empty($errors)) {
+                    return Validator::respondWithErrors($response, $errors);
+                }
+
+                $db = Database::getInstance();
+                $db->beginTransaction();
+                try {
+                    $stmt = $db->prepare('UPDATE tasks SET sort_order = :sortOrder WHERE id = :id AND deleted_at IS NULL');
+                    foreach ($data['taskIds'] as $i => $taskId) {
+                        $stmt->execute(['sortOrder' => $i, 'id' => $taskId]);
+                    }
+                    $db->commit();
+                } catch (\Exception $e) {
+                    $db->rollBack();
+                    throw $e;
+                }
+
+                $response->getBody()->write(json_encode(['message' => 'Tasks reordered successfully']));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+            });
+
+            // PUT /tasks/bulk-update
+            $group->put('/bulk-update', function (Request $request, Response $response) {
+                $data = $request->getParsedBody() ?? [];
+
+                // Validate taskIds
+                if (!isset($data['taskIds']) || !is_array($data['taskIds']) || empty($data['taskIds'])) {
+                    $response->getBody()->write(json_encode(['error' => 'taskIds must be a non-empty array of UUIDs']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+                foreach ($data['taskIds'] as $taskId) {
+                    if (!is_string($taskId) || !preg_match(TaskRoutes::UUID_PATTERN, $taskId)) {
+                        $response->getBody()->write(json_encode(['error' => 'taskIds must contain only valid UUIDs']));
+                        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                    }
+                }
+
+                // Validate fields
+                if (!isset($data['fields']) || !is_array($data['fields']) || empty($data['fields'])) {
+                    $response->getBody()->write(json_encode(['error' => 'fields must be a non-empty object']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+
+                $allowedFields = ['status', 'priority', 'sprintId', 'inSprintBacklog'];
+                foreach (array_keys($data['fields']) as $key) {
+                    if (!in_array($key, $allowedFields, true)) {
+                        $response->getBody()->write(json_encode(['error' => "Field '{$key}' is not allowed"]));
+                        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                    }
+                }
+
+                $fields = $data['fields'];
+                if (isset($fields['status']) && !in_array($fields['status'], ['todo', 'in_progress', 'review', 'done'], true)) {
+                    $response->getBody()->write(json_encode(['error' => 'status must be one of: todo, in_progress, review, done']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+                if (isset($fields['priority']) && !in_array($fields['priority'], ['low', 'medium', 'high', 'urgent'], true)) {
+                    $response->getBody()->write(json_encode(['error' => 'priority must be one of: low, medium, high, urgent']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+                if (array_key_exists('sprintId', $fields) && $fields['sprintId'] !== null && !preg_match(TaskRoutes::UUID_PATTERN, $fields['sprintId'])) {
+                    $response->getBody()->write(json_encode(['error' => 'sprintId must be null or a valid UUID']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+                if (array_key_exists('inSprintBacklog', $fields) && !is_bool($fields['inSprintBacklog'])) {
+                    $response->getBody()->write(json_encode(['error' => 'inSprintBacklog must be a boolean']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+
+                // Build dynamic SET clause
+                $columnMap = [
+                    'status' => 'status',
+                    'priority' => 'priority',
+                    'sprintId' => 'sprint_id',
+                    'inSprintBacklog' => 'in_sprint_backlog',
+                ];
+
+                $setClauses = [];
+                $setParams = [];
+                foreach ($fields as $key => $value) {
+                    $col = $columnMap[$key];
+                    $setClauses[] = "{$col} = :{$col}";
+                    $setParams[$col] = $key === 'inSprintBacklog' ? (int) $value : $value;
+                }
+
+                $in = TaskModel::buildInClause($data['taskIds'], 'tid');
+                $setString = implode(', ', $setClauses);
+                $sql = "UPDATE tasks SET {$setString} WHERE id IN ({$in['clause']}) AND deleted_at IS NULL";
+
+                $db = Database::getInstance();
+                $stmt = $db->prepare($sql);
+                $stmt->execute(array_merge($setParams, $in['params']));
+
+                $response->getBody()->write(json_encode(['count' => $stmt->rowCount()]));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+            });
+
+            // PATCH /tasks/bulk
+            $group->patch('/bulk', function (Request $request, Response $response) {
+                $data = $request->getParsedBody() ?? [];
+
+                // Validate updates array
+                if (!isset($data['updates']) || !is_array($data['updates']) || empty($data['updates'])) {
+                    $response->getBody()->write(json_encode(['error' => 'updates must be a non-empty array']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+                if (count($data['updates']) > 100) {
+                    $response->getBody()->write(json_encode(['error' => 'updates must contain at most 100 items']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+
+                $allowedFields = ['status', 'priority', 'sprintId', 'inSprintBacklog'];
+                $columnMap = [
+                    'status' => 'status',
+                    'priority' => 'priority',
+                    'sprintId' => 'sprint_id',
+                    'inSprintBacklog' => 'in_sprint_backlog',
+                ];
+
+                foreach ($data['updates'] as $i => $entry) {
+                    if (!isset($entry['id']) || !preg_match(TaskRoutes::UUID_PATTERN, $entry['id'])) {
+                        $response->getBody()->write(json_encode(['error' => "updates[{$i}].id must be a valid UUID"]));
+                        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                    }
+                    if (!isset($entry['fields']) || !is_array($entry['fields']) || empty($entry['fields'])) {
+                        $response->getBody()->write(json_encode(['error' => "updates[{$i}].fields must be a non-empty object"]));
+                        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                    }
+                    foreach (array_keys($entry['fields']) as $key) {
+                        if (!in_array($key, $allowedFields, true)) {
+                            $response->getBody()->write(json_encode(['error' => "Field '{$key}' is not allowed"]));
+                            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                        }
+                    }
+                    $fields = $entry['fields'];
+                    if (isset($fields['status']) && !in_array($fields['status'], ['todo', 'in_progress', 'review', 'done'], true)) {
+                        $response->getBody()->write(json_encode(['error' => 'status must be one of: todo, in_progress, review, done']));
+                        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                    }
+                    if (isset($fields['priority']) && !in_array($fields['priority'], ['low', 'medium', 'high', 'urgent'], true)) {
+                        $response->getBody()->write(json_encode(['error' => 'priority must be one of: low, medium, high, urgent']));
+                        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                    }
+                    if (array_key_exists('sprintId', $fields) && $fields['sprintId'] !== null && !preg_match(TaskRoutes::UUID_PATTERN, $fields['sprintId'])) {
+                        $response->getBody()->write(json_encode(['error' => 'sprintId must be null or a valid UUID']));
+                        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                    }
+                    if (array_key_exists('inSprintBacklog', $fields) && !is_bool($fields['inSprintBacklog'])) {
+                        $response->getBody()->write(json_encode(['error' => 'inSprintBacklog must be a boolean']));
+                        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                    }
+                }
+
+                $db = Database::getInstance();
+                $totalAffected = 0;
+
+                $db->beginTransaction();
+                try {
+                    foreach ($data['updates'] as $entry) {
+                        $setClauses = [];
+                        $params = ['id' => $entry['id']];
+
+                        foreach ($entry['fields'] as $key => $value) {
+                            $col = $columnMap[$key];
+                            $setClauses[] = "{$col} = :{$col}";
+                            $params[$col] = $key === 'inSprintBacklog' ? (int) $value : $value;
+                        }
+
+                        $setString = implode(', ', $setClauses);
+                        $stmt = $db->prepare("UPDATE tasks SET {$setString} WHERE id = :id AND deleted_at IS NULL");
+                        $stmt->execute($params);
+                        $totalAffected += $stmt->rowCount();
+                    }
+                    $db->commit();
+                } catch (\Exception $e) {
+                    $db->rollBack();
+                    throw $e;
+                }
+
+                $response->getBody()->write(json_encode(['count' => $totalAffected]));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+            });
+
+            // POST /tasks/bulk-delete
+            $group->post('/bulk-delete', function (Request $request, Response $response) {
+                $data = $request->getParsedBody() ?? [];
+
+                $errors = Validator::validate($data, [
+                    'taskIds' => 'required|uuid_array',
+                ]);
+
+                if (!empty($errors)) {
+                    return Validator::respondWithErrors($response, $errors);
+                }
+
+                if (empty($data['taskIds'])) {
+                    $response->getBody()->write(json_encode(['error' => 'taskIds must be a non-empty array']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+
+                $in = TaskModel::buildInClause($data['taskIds'], 'tid');
+                $db = Database::getInstance();
+                $stmt = $db->prepare("UPDATE tasks SET deleted_at = NOW() WHERE id IN ({$in['clause']}) AND deleted_at IS NULL");
+                $stmt->execute($in['params']);
+
+                $response->getBody()->write(json_encode(['count' => $stmt->rowCount()]));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+            });
 
             // ============================================================
             // COLLECTION ROUTES
@@ -726,6 +942,181 @@ class TaskRoutes
                 $stmt->execute(['id' => $id]);
 
                 $response->getBody()->write(json_encode(['message' => 'Task deleted successfully']));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+            });
+
+            // ============================================================
+            // SUBTASK ROUTES
+            // ============================================================
+
+            // POST /tasks/{id}/subtasks
+            $group->post('/{id}/subtasks', function (Request $request, Response $response, array $args) {
+                $id = $args['id'];
+
+                if (!preg_match(TaskRoutes::UUID_PATTERN, $id)) {
+                    $response->getBody()->write(json_encode(['error' => 'id must be a valid UUID']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+
+                $data = $request->getParsedBody() ?? [];
+
+                $errors = Validator::validate($data, [
+                    'title' => 'required|min:1|max:255',
+                ]);
+
+                if (!empty($errors)) {
+                    return Validator::respondWithErrors($response, $errors);
+                }
+
+                $db = Database::getInstance();
+
+                // Verify parent task exists and is not deleted
+                $stmt = $db->prepare('SELECT id FROM tasks WHERE id = :id AND deleted_at IS NULL');
+                $stmt->execute(['id' => $id]);
+                if (!$stmt->fetch()) {
+                    $response->getBody()->write(json_encode(['error' => 'Task not found']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+                }
+
+                // Get next sort_order
+                $stmt = $db->prepare('SELECT MAX(sort_order) AS max_order FROM subtasks WHERE task_id = :taskId');
+                $stmt->execute(['taskId' => $id]);
+                $row = $stmt->fetch();
+                $sortOrder = ($row['max_order'] !== null) ? (int) $row['max_order'] + 1 : 0;
+
+                // Insert subtask
+                $subtaskId = Uuid::uuid4()->toString();
+                $stmt = $db->prepare(
+                    'INSERT INTO subtasks (id, title, sort_order, task_id) VALUES (:id, :title, :sortOrder, :taskId)'
+                );
+                $stmt->execute([
+                    'id' => $subtaskId,
+                    'title' => $data['title'],
+                    'sortOrder' => $sortOrder,
+                    'taskId' => $id,
+                ]);
+
+                // Re-fetch
+                $stmt = $db->prepare('SELECT id, title, completed, sort_order, task_id, created_at FROM subtasks WHERE id = :id');
+                $stmt->execute(['id' => $subtaskId]);
+                $row = $stmt->fetch();
+
+                $subtask = [
+                    'id' => $row['id'],
+                    'title' => $row['title'],
+                    'completed' => (bool) $row['completed'],
+                    'sortOrder' => (int) $row['sort_order'],
+                    'taskId' => $row['task_id'],
+                    'createdAt' => date('c', strtotime($row['created_at'])),
+                ];
+
+                $response->getBody()->write(json_encode(['subtask' => $subtask]));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(201);
+            });
+
+            // PUT /tasks/{taskId}/subtasks/{subtaskId}
+            $group->put('/{taskId}/subtasks/{subtaskId}', function (Request $request, Response $response, array $args) {
+                $taskId = $args['taskId'];
+                $subtaskId = $args['subtaskId'];
+
+                if (!preg_match(TaskRoutes::UUID_PATTERN, $taskId)) {
+                    $response->getBody()->write(json_encode(['error' => 'taskId must be a valid UUID']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+                if (!preg_match(TaskRoutes::UUID_PATTERN, $subtaskId)) {
+                    $response->getBody()->write(json_encode(['error' => 'subtaskId must be a valid UUID']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+
+                $data = $request->getParsedBody() ?? [];
+
+                $errors = Validator::validate($data, [
+                    'title' => 'optional|min:1|max:255',
+                    'completed' => 'optional|boolean',
+                ]);
+
+                if (!empty($errors)) {
+                    return Validator::respondWithErrors($response, $errors);
+                }
+
+                if (!array_key_exists('title', $data) && !array_key_exists('completed', $data)) {
+                    $response->getBody()->write(json_encode(['error' => 'At least one field (title or completed) must be provided']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+
+                $db = Database::getInstance();
+
+                // Verify subtask exists and belongs to task
+                $stmt = $db->prepare('SELECT id FROM subtasks WHERE id = :subtaskId AND task_id = :taskId');
+                $stmt->execute(['subtaskId' => $subtaskId, 'taskId' => $taskId]);
+                if (!$stmt->fetch()) {
+                    $response->getBody()->write(json_encode(['error' => 'Subtask not found']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+                }
+
+                // Build dynamic UPDATE
+                $setClauses = [];
+                $params = ['subtaskId' => $subtaskId];
+
+                if (array_key_exists('title', $data)) {
+                    $setClauses[] = 'title = :title';
+                    $params['title'] = $data['title'];
+                }
+                if (array_key_exists('completed', $data)) {
+                    $setClauses[] = 'completed = :completed';
+                    $params['completed'] = (int) $data['completed'];
+                }
+
+                $setString = implode(', ', $setClauses);
+                $stmt = $db->prepare("UPDATE subtasks SET {$setString} WHERE id = :subtaskId");
+                $stmt->execute($params);
+
+                // Re-fetch
+                $stmt = $db->prepare('SELECT id, title, completed, sort_order, task_id, created_at FROM subtasks WHERE id = :id');
+                $stmt->execute(['id' => $subtaskId]);
+                $row = $stmt->fetch();
+
+                $subtask = [
+                    'id' => $row['id'],
+                    'title' => $row['title'],
+                    'completed' => (bool) $row['completed'],
+                    'sortOrder' => (int) $row['sort_order'],
+                    'taskId' => $row['task_id'],
+                    'createdAt' => date('c', strtotime($row['created_at'])),
+                ];
+
+                $response->getBody()->write(json_encode(['subtask' => $subtask]));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+            });
+
+            // DELETE /tasks/{taskId}/subtasks/{subtaskId}
+            $group->delete('/{taskId}/subtasks/{subtaskId}', function (Request $request, Response $response, array $args) {
+                $taskId = $args['taskId'];
+                $subtaskId = $args['subtaskId'];
+
+                if (!preg_match(TaskRoutes::UUID_PATTERN, $taskId)) {
+                    $response->getBody()->write(json_encode(['error' => 'taskId must be a valid UUID']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+                if (!preg_match(TaskRoutes::UUID_PATTERN, $subtaskId)) {
+                    $response->getBody()->write(json_encode(['error' => 'subtaskId must be a valid UUID']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+
+                $db = Database::getInstance();
+
+                // Verify subtask exists and belongs to task
+                $stmt = $db->prepare('SELECT id FROM subtasks WHERE id = :subtaskId AND task_id = :taskId');
+                $stmt->execute(['subtaskId' => $subtaskId, 'taskId' => $taskId]);
+                if (!$stmt->fetch()) {
+                    $response->getBody()->write(json_encode(['error' => 'Subtask not found']));
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+                }
+
+                $stmt = $db->prepare('DELETE FROM subtasks WHERE id = :subtaskId');
+                $stmt->execute(['subtaskId' => $subtaskId]);
+
+                $response->getBody()->write(json_encode(['message' => 'Subtask deleted successfully']));
                 return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
             });
 
