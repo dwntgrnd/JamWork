@@ -337,8 +337,8 @@ class TaskRoutes
                         'status' => $data['status'] ?? 'todo',
                         'priority' => $data['priority'] ?? 'medium',
                         'effort' => isset($data['effort']) && $data['effort'] !== null ? (int) $data['effort'] : null,
-                        'due_date' => $data['dueDate'] ?? null,
-                        'start_date' => $data['startDate'] ?? null,
+                        'due_date' => Validator::toMySQLDate($data['dueDate'] ?? null),
+                        'start_date' => Validator::toMySQLDate($data['startDate'] ?? null),
                         'sort_order' => $sortOrder,
                         'recurrence' => $data['recurrence'] ?? null,
                         'sprint_id' => $data['sprintId'] ?? null,
@@ -617,11 +617,11 @@ class TaskRoutes
                 }
                 if (array_key_exists('dueDate', $data)) {
                     $updates[] = 'due_date = :due_date';
-                    $updateParams['due_date'] = $data['dueDate'];
+                    $updateParams['due_date'] = Validator::toMySQLDate($data['dueDate']);
                 }
                 if (array_key_exists('startDate', $data)) {
                     $updates[] = 'start_date = :start_date';
-                    $updateParams['start_date'] = $data['startDate'];
+                    $updateParams['start_date'] = Validator::toMySQLDate($data['startDate']);
                 }
                 if (array_key_exists('recurrence', $data)) {
                     $updates[] = 'recurrence = :recurrence';

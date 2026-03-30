@@ -92,7 +92,7 @@ class MilestoneRoutes
                 $stmt->execute([
                     'id' => $id,
                     'name' => $data['name'],
-                    'date' => $data['date'],
+                    'date' => Validator::toMySQLDate($data['date']),
                     'project_id' => $projectId,
                     'created_by_id' => $userId,
                 ]);
@@ -165,7 +165,7 @@ class MilestoneRoutes
 
                 if (isset($data['date'])) {
                     $updates[] = 'date = :date';
-                    $params['date'] = $data['date'];
+                    $params['date'] = Validator::toMySQLDate($data['date']);
                 }
 
                 if (array_key_exists('projectId', $data)) {

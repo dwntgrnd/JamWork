@@ -230,8 +230,8 @@ class SprintRoutes
                     'id' => $id,
                     'name' => $data['name'],
                     'description' => $data['description'] ?? null,
-                    'start_date' => $data['startDate'],
-                    'end_date' => $data['endDate'],
+                    'start_date' => Validator::toMySQLDate($data['startDate']),
+                    'end_date' => Validator::toMySQLDate($data['endDate']),
                     'status' => 'active',
                     'project_id' => $projectId,
                     'created_by_id' => $userId,
@@ -448,12 +448,12 @@ class SprintRoutes
 
                 if (isset($data['startDate'])) {
                     $updates[] = 'start_date = :start_date';
-                    $params['start_date'] = $data['startDate'];
+                    $params['start_date'] = Validator::toMySQLDate($data['startDate']);
                 }
 
                 if (isset($data['endDate'])) {
                     $updates[] = 'end_date = :end_date';
-                    $params['end_date'] = $data['endDate'];
+                    $params['end_date'] = Validator::toMySQLDate($data['endDate']);
                 }
 
                 if (isset($data['status'])) {

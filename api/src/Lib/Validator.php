@@ -183,6 +183,24 @@ class Validator
         return null;
     }
 
+    /**
+     * Convert an ISO 8601 date string to MySQL TIMESTAMP format.
+     * Returns null if input is null.
+     */
+    public static function toMySQLDate(?string $isoDate): ?string
+    {
+        if ($isoDate === null) {
+            return null;
+        }
+        $dt = \DateTimeImmutable::createFromFormat(\DateTimeInterface::ATOM, $isoDate)
+            ?: \DateTimeImmutable::createFromFormat('Y-m-d\TH:i:s.uP', $isoDate)
+            ?: \DateTimeImmutable::createFromFormat('Y-m-d', $isoDate);
+        if ($dt === false) {
+            throw new \InvalidArgumentException("Cannot parse date: {$isoDate}");
+        }
+        return $dt->format('Y-m-d H:i:s');
+    }
+
     private static function ruleUuidArray(string $field, mixed $value): ?array
     {
         if ($value === null) {

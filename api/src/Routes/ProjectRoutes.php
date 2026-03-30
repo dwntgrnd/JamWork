@@ -104,8 +104,8 @@ class ProjectRoutes
                     'id' => $id,
                     'name' => $data['name'],
                     'description' => $data['description'] ?? null,
-                    'start_date' => $data['startDate'] ?? null,
-                    'end_date' => $data['endDate'] ?? null,
+                    'start_date' => Validator::toMySQLDate($data['startDate'] ?? null),
+                    'end_date' => Validator::toMySQLDate($data['endDate'] ?? null),
                     'created_by_id' => $userId,
                 ]);
 
@@ -184,12 +184,12 @@ class ProjectRoutes
 
                 if (array_key_exists('startDate', $data)) {
                     $updates[] = 'start_date = :start_date';
-                    $params['start_date'] = $data['startDate'];
+                    $params['start_date'] = Validator::toMySQLDate($data['startDate']);
                 }
 
                 if (array_key_exists('endDate', $data)) {
                     $updates[] = 'end_date = :end_date';
-                    $params['end_date'] = $data['endDate'];
+                    $params['end_date'] = Validator::toMySQLDate($data['endDate']);
                 }
 
                 if (!empty($updates)) {
