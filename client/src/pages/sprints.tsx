@@ -97,6 +97,9 @@ export default function GlobalSprintsPage() {
   const [showTaskDrawer, setShowTaskDrawer] = useState(false);
   const [drawerSprintId, setDrawerSprintId] = useState<string | null>(null);
 
+  // Task edit drawer state
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
   useEffect(() => {
     fetchAllData();
     fetchProjects();
@@ -525,7 +528,8 @@ export default function GlobalSprintsPage() {
                                 {group.tasks.map((task) => (
                                   <div
                                     key={task.id}
-                                    className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
+                                    className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/50 transition-colors cursor-pointer"
+                                    onClick={() => setEditingTask(task)}
                                   >
                                     <span
                                       className={cn(
@@ -547,6 +551,7 @@ export default function GlobalSprintsPage() {
                                         {task.assignees.length} {task.assignees.length === 1 ? 'assignee' : 'assignees'}
                                       </span>
                                     )}
+                                    <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                     <Select
                                       value={undefined}
                                       onValueChange={(value) => {
@@ -576,6 +581,7 @@ export default function GlobalSprintsPage() {
                                         ))}
                                       </SelectContent>
                                     </Select>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -680,7 +686,8 @@ export default function GlobalSprintsPage() {
                                 {group.tasks.map((task) => (
                                   <div
                                     key={task.id}
-                                    className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
+                                    className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/50 transition-colors cursor-pointer"
+                                    onClick={() => setEditingTask(task)}
                                   >
                                     <span
                                       className={cn(
@@ -702,6 +709,7 @@ export default function GlobalSprintsPage() {
                                         {task.assignees.length} {task.assignees.length === 1 ? 'assignee' : 'assignees'}
                                       </span>
                                     )}
+                                    <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                     <Select
                                       value={undefined}
                                       onValueChange={(value) => {
@@ -731,6 +739,7 @@ export default function GlobalSprintsPage() {
                                         ))}
                                       </SelectContent>
                                     </Select>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -1126,7 +1135,7 @@ export default function GlobalSprintsPage() {
             ) : (
               <div className="border rounded-md divide-y bg-card">
                 {sortedFilteredBacklog.map((task) => (
-                  <div key={task.id} className="group flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/50 transition-colors">
+                  <div key={task.id} className="group flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => setEditingTask(task)}>
                     {/* Checkbox */}
                     <Checkbox
                       className={cn("flex-shrink-0", selectedTaskIds.size === 0 && "opacity-0 group-hover:opacity-100 transition-opacity")}
@@ -1191,7 +1200,7 @@ export default function GlobalSprintsPage() {
                     )}
 
                     {/* Sprint assignment */}
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                       <Select
                         value={undefined}
                         onValueChange={(value) => {
@@ -1377,7 +1386,7 @@ export default function GlobalSprintsPage() {
       </DialogContent>
     </Dialog>
 
-    {/* Task Drawer */}
+    {/* Task Create Drawer */}
     {showTaskDrawer && (
       <TaskDrawer
         mode="create"
@@ -1388,6 +1397,23 @@ export default function GlobalSprintsPage() {
           window.dispatchEvent(new Event('sprints-updated'));
         }}
         onClose={() => setShowTaskDrawer(false)}
+      />
+    )}
+
+    {/* Task Edit Drawer */}
+    {editingTask && (
+      <TaskDrawer
+        mode="edit"
+        task={editingTask}
+        onSave={() => {
+          setEditingTask(null);
+          fetchAllData();
+          window.dispatchEvent(new Event('sprints-updated'));
+        }}
+        onClose={() => {
+          setEditingTask(null);
+          fetchAllData();
+        }}
       />
     )}
     </>
