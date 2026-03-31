@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation, Link } from 'react-router';
+import { useLocation, useNavigate, Link } from 'react-router';
 import { apiGet, apiPost, apiDelete } from '@/lib/api';
 import { Project } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -113,7 +114,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
       setNewProjectEndDate('');
 
       // Navigate to new project
-      window.location.href = `/projects/${data.project.id}`;
+      navigate(`/projects/${data.project.id}`);
     } catch (err: any) {
       setError(err.message || 'Failed to create project');
     }
