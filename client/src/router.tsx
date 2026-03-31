@@ -2,6 +2,8 @@ import { createBrowserRouter } from 'react-router';
 import LoginPage from './pages/login';
 import SignupPage from './pages/signup';
 import ResetPasswordPage from './pages/reset-password';
+import ForgotPasswordPage from './pages/forgot-password';
+import SetNewPasswordPage from './pages/set-new-password';
 import RootRedirect from './pages/root-redirect';
 import ProtectedLayout from './pages/protected-layout';
 import MyTasksPage from './pages/my-tasks';
@@ -39,6 +41,14 @@ export const router = createBrowserRouter([
   {
     path: '/reset-password',
     element: <AuthProvider><ResetPasswordPage /></AuthProvider>,
+  },
+  {
+    path: '/forgot-password',
+    element: <AuthProvider><ForgotPasswordPage /></AuthProvider>,
+  },
+  {
+    path: '/set-new-password',
+    element: <AuthProvider><SetNewPasswordPage /></AuthProvider>,
   },
   {
     path: '/',

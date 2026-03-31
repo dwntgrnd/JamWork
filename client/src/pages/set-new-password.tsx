@@ -1,27 +1,49 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { useAuth } from '@/hooks/use-auth';
+import { useState } from 'react';
+import { useSearchParams, Link, useNavigate } from 'react-router';
+import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PasswordGenerator } from '@/components/password-generator';
 
-export default function ResetPasswordPage() {
+export default function SetNewPasswordPage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const token = searchParams.get('token');
+
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { user, resetPassword } = useAuth();
-  const navigate = useNavigate();
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (user && !user.mustResetPassword) {
-      navigate('/my-tasks');
-    } else if (!user) {
-      navigate('/login');
-    }
-  }, [user, navigate]);
+  // No token in URL -> invalid access
+  if (!token) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="w-full max-w-md mx-auto px-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Invalid Reset Link</CardTitle>
+              <CardDescription>
+                This password reset link is missing or invalid.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link to="/forgot-password">
+                <Button className="w-full">Request a New Reset Link</Button>
+              </Link>
+              <div className="mt-4 text-center text-sm text-muted-foreground">
+                <Link to="/login" className="text-primary hover:underline">
+                  Back to login
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,28 +62,34 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      await resetPassword(newPassword);
-      navigate('/my-tasks');
+      await apiPost('/auth/set-new-password', { token, newPassword });
+      navigate('/login?reset=success');
     } catch (err: any) {
-      setError(err.message || 'Failed to reset password');
+      setError(err.message || 'Failed to reset password. The link may have expired.');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!user || !user.mustResetPassword) {
-    return null;
-  }
+  const handleGenerate = (pw: string) => {
+    setNewPassword(pw);
+    setConfirmPassword(pw);
+  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
-      <div className="w-full max-w-md mx-auto mt-20 px-4">
+      <div className="w-full max-w-md mx-auto px-4">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-foreground mb-2">AK12: JamWork</h1>
+          <p className="text-muted-foreground">
+            Lightweight task management for small teams
+          </p>
+        </div>
+
         <Card>
           <CardHeader>
-            <CardTitle>Set Your New Password</CardTitle>
-            <CardDescription>
-              You must change your temporary password before continuing
-            </CardDescription>
+            <CardTitle>Set New Password</CardTitle>
+            <CardDescription>Choose a new password for your account</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -77,7 +105,7 @@ export default function ResetPasswordPage() {
                   autoComplete="new-password"
                 />
                 <p className="text-xs text-muted-foreground">Minimum 10 characters</p>
-                <PasswordGenerator onGenerate={(pw) => { setNewPassword(pw); setConfirmPassword(pw); }} />
+                <PasswordGenerator onGenerate={handleGenerate} />
               </div>
 
               <div className="space-y-2">
@@ -94,15 +122,19 @@ export default function ResetPasswordPage() {
               </div>
 
               {error && (
-                <div className="text-sm text-destructive">
-                  {error}
-                </div>
+                <div className="text-sm text-destructive">{error}</div>
               )}
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Setting password...' : 'Set New Password'}
               </Button>
             </form>
+
+            <div className="mt-4 text-center text-sm text-muted-foreground">
+              <Link to="/login" className="text-primary hover:underline">
+                Back to login
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </div>

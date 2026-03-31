@@ -34,7 +34,6 @@ export default function AdminPage() {
   const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [password, setPassword] = useState('');
   const [inviteError, setInviteError] = useState('');
   const [inviteSuccess, setInviteSuccess] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -105,13 +104,11 @@ export default function AdminPage() {
       const response = await apiPost<{ user: User; temporaryPassword: string; message: string }>('/admin/invite', {
         email,
         displayName,
-        password,
       });
 
       setInviteSuccess(`User invited. Temporary password: ${response.temporaryPassword}`);
       setEmail('');
       setDisplayName('');
-      setPassword('');
 
       // Refresh users list
       const usersResponse = await apiGet<{ users: User[] }>('/auth/users');
@@ -349,7 +346,7 @@ export default function AdminPage() {
           <Card className="mb-8">
             <CardHeader>
               <CardTitle>Add User</CardTitle>
-              <CardDescription>Create a new account and share the temporary password with the user</CardDescription>
+              <CardDescription>Create a new account — a temporary password will be generated automatically</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleInvite} className="space-y-4">
@@ -376,22 +373,6 @@ export default function AdminPage() {
                       maxLength={100}
                     />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Temporary Password <span className="text-destructive">*</span></Label>
-                  <Input
-                    id="password"
-                    type="text"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={10}
-                    placeholder="At least 10 characters"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    The user will be required to change this on first login.
-                  </p>
                 </div>
 
                 {inviteError && (

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router';
 import { useAuth } from '@/hooks/use-auth';
+import { apiGet } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,7 +16,16 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  const [hasAdmin, setHasAdmin] = useState(true); // Default true to hide link initially
+
   const showExpiredMessage = searchParams.get('expired') === 'true';
+  const showResetSuccess = searchParams.get('reset') === 'success';
+
+  useEffect(() => {
+    apiGet<{ hasAdmin: boolean }>('/auth/status')
+      .then((data) => setHasAdmin(data.hasAdmin))
+      .catch(() => setHasAdmin(true)); // On error, default to hiding signup link
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +69,12 @@ export default function LoginPage() {
               </div>
             )}
 
+            {showResetSuccess && (
+              <div className="mb-4 p-3 bg-success/10 border border-success/25 rounded text-sm text-success">
+                Password reset successfully. You can now log in with your new password.
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -95,11 +111,20 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="mt-4 text-center text-sm text-muted-foreground">
-              Don't have an account?{' '}
-              <Link to="/signup" className="text-primary hover:underline">
-                Create admin account
-              </Link>
+            <div className="mt-4 text-center text-sm text-muted-foreground space-y-2">
+              <div>
+                <Link to="/forgot-password" className="text-primary hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
+              {!hasAdmin && (
+                <div>
+                  Don't have an account?{' '}
+                  <Link to="/signup" className="text-primary hover:underline">
+                    Create admin account
+                  </Link>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

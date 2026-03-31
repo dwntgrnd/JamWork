@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ArrowLeft, Sun, Moon, Monitor } from 'lucide-react';
+import { PasswordGenerator } from '@/components/password-generator';
 
 export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -234,6 +235,7 @@ export default function SettingsPage() {
                     autoComplete="new-password"
                   />
                   <p className="text-xs text-muted-foreground">Minimum 10 characters</p>
+                  <PasswordGenerator onGenerate={(pw) => { setNewPassword(pw); setConfirmPassword(pw); }} />
                 </div>
 
                 <div className="space-y-2">

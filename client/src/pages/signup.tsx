@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { useAuth } from '@/hooks/use-auth';
+import { apiGet } from '@/lib/api';
+import { PasswordGenerator } from '@/components/password-generator';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,8 +14,21 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const { signup } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    apiGet<{ hasAdmin: boolean }>('/auth/status')
+      .then((data) => {
+        if (data.hasAdmin) {
+          navigate('/login');
+        } else {
+          setChecking(false);
+        }
+      })
+      .catch(() => setChecking(false));
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +48,10 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
+
+  if (checking) {
+    return null;
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
@@ -88,6 +107,7 @@ export default function SignupPage() {
                   autoComplete="new-password"
                 />
                 <p className="text-xs text-muted-foreground">Minimum 10 characters</p>
+                <PasswordGenerator onGenerate={(pw) => setPassword(pw)} />
               </div>
 
               {error && (
