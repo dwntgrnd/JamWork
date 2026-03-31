@@ -4,6 +4,7 @@ namespace JamWork\Routes;
 
 use JamWork\Lib\Auth;
 use JamWork\Lib\Database;
+use JamWork\Lib\Mailer;
 use JamWork\Lib\Validator;
 use JamWork\Middleware\AuthMiddleware;
 use JamWork\Middleware\RateLimitMiddleware;
@@ -18,6 +19,163 @@ class AuthRoutes
     public static function register(App $app): void
     {
         $app->group('/auth', function (RouteCollectorProxy $group) {
+
+            // GET /auth/status — public, no auth required
+            $group->get('/status', function (Request $request, Response $response) {
+                $db = Database::getInstance();
+                $stmt = $db->query('SELECT COUNT(*) as count FROM users');
+                $count = (int) $stmt->fetch()['count'];
+
+                $response->getBody()->write(json_encode([
+                    'hasAdmin' => $count > 0,
+                ]));
+                return $response
+                    ->withHeader('Content-Type', 'application/json')
+                    ->withStatus(200);
+            });
+
+            // POST /auth/forgot-password — public, rate limited
+            $group->post('/forgot-password', function (Request $request, Response $response) {
+                $data = $request->getParsedBody() ?? [];
+
+                $errors = Validator::validate($data, [
+                    'email' => 'required|email',
+                ]);
+
+                if (!empty($errors)) {
+                    return Validator::respondWithErrors($response, $errors);
+                }
+
+                $db = Database::getInstance();
+                $email = strtolower(trim($data['email']));
+
+                // Always return success (anti-enumeration)
+                $genericResponse = function () use ($response) {
+                    $response->getBody()->write(json_encode([
+                        'message' => 'If an account with that email exists, a password reset link has been sent.',
+                    ]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(200);
+                };
+
+                // Look up user
+                $stmt = $db->prepare('SELECT id, email, display_name FROM users WHERE email = :email');
+                $stmt->execute(['email' => $email]);
+                $user = $stmt->fetch();
+
+                if (!$user) {
+                    return $genericResponse();
+                }
+
+                // Invalidate any existing tokens for this user
+                $stmt = $db->prepare(
+                    'UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = :userId AND used_at IS NULL'
+                );
+                $stmt->execute(['userId' => $user['id']]);
+
+                // Generate token: 32 bytes → URL-safe base64
+                $rawToken = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+                $tokenHash = password_hash($rawToken, PASSWORD_BCRYPT, ['cost' => 12]);
+                $tokenId = Uuid::uuid4()->toString();
+                $expiresAt = date('Y-m-d H:i:s', time() + 3600); // 1 hour
+
+                $stmt = $db->prepare(
+                    'INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
+                     VALUES (:id, :userId, :tokenHash, :expiresAt)'
+                );
+                $stmt->execute([
+                    'id' => $tokenId,
+                    'userId' => $user['id'],
+                    'tokenHash' => $tokenHash,
+                    'expiresAt' => $expiresAt,
+                ]);
+
+                // Send email
+                if (Mailer::isConfigured()) {
+                    $mailer = new Mailer();
+                    $appUrl = $_ENV['APP_URL'] ?? '';
+                    $resetUrl = $appUrl . '/set-new-password?token=' . $rawToken;
+
+                    // Get workspace name
+                    $stmt = $db->prepare('SELECT `value` FROM `workspace_settings` WHERE `key` = :key');
+                    $stmt->execute(['key' => 'workspace_name']);
+                    $wsRow = $stmt->fetch();
+                    $workspaceName = $wsRow ? $wsRow['value'] : 'JamWork';
+
+                    $mailer->sendPasswordResetEmail(
+                        $user['email'],
+                        $user['display_name'],
+                        $resetUrl,
+                        $workspaceName
+                    );
+                }
+
+                return $genericResponse();
+            })->add(RateLimitMiddleware::loginLimiter());
+
+            // POST /auth/set-new-password — public, rate limited
+            $group->post('/set-new-password', function (Request $request, Response $response) {
+                $data = $request->getParsedBody() ?? [];
+
+                $errors = Validator::validate($data, [
+                    'token' => 'required',
+                    'newPassword' => 'required|min:10',
+                ]);
+
+                if (!empty($errors)) {
+                    return Validator::respondWithErrors($response, $errors);
+                }
+
+                $db = Database::getInstance();
+                $rawToken = $data['token'];
+
+                // Find all non-expired, non-used tokens
+                $stmt = $db->prepare(
+                    'SELECT prt.id, prt.user_id, prt.token_hash, prt.expires_at
+                     FROM password_reset_tokens prt
+                     WHERE prt.used_at IS NULL AND prt.expires_at > NOW()
+                     ORDER BY prt.created_at DESC'
+                );
+                $stmt->execute();
+                $tokens = $stmt->fetchAll();
+
+                // Verify the raw token against stored hashes
+                $matchedToken = null;
+                foreach ($tokens as $tokenRow) {
+                    if (password_verify($rawToken, $tokenRow['token_hash'])) {
+                        $matchedToken = $tokenRow;
+                        break;
+                    }
+                }
+
+                if (!$matchedToken) {
+                    $response->getBody()->write(json_encode([
+                        'error' => 'Invalid or expired reset link. Please request a new one.',
+                    ]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(400);
+                }
+
+                // Update password
+                $passwordHash = Auth::hashPassword($data['newPassword']);
+                $stmt = $db->prepare(
+                    'UPDATE users SET password_hash = :hash, must_reset_password = 0 WHERE id = :id'
+                );
+                $stmt->execute(['hash' => $passwordHash, 'id' => $matchedToken['user_id']]);
+
+                // Mark token as used
+                $stmt = $db->prepare('UPDATE password_reset_tokens SET used_at = NOW() WHERE id = :id');
+                $stmt->execute(['id' => $matchedToken['id']]);
+
+                $response->getBody()->write(json_encode([
+                    'message' => 'Password has been reset. You can now log in.',
+                ]));
+                return $response
+                    ->withHeader('Content-Type', 'application/json')
+                    ->withStatus(200);
+            })->add(RateLimitMiddleware::loginLimiter());
 
             // POST /auth/signup
             $group->post('/signup', function (Request $request, Response $response) {

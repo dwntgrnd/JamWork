@@ -79,4 +79,40 @@ class Mailer
             $this->mail->clearAddresses();
         }
     }
+
+    public function sendPasswordResetEmail(
+        string $toEmail,
+        string $displayName,
+        string $resetUrl,
+        string $workspaceName
+    ): array {
+        try {
+            $this->mail->addAddress($toEmail, $displayName);
+            $this->mail->Subject = "Reset your {$workspaceName} password";
+
+            $templatePath = __DIR__ . '/../Mail/templates/password-reset.html';
+            $html = file_get_contents($templatePath);
+
+            $html = str_replace(
+                ['{{WORKSPACE_NAME}}', '{{DISPLAY_NAME}}', '{{RESET_URL}}'],
+                [htmlspecialchars($workspaceName), htmlspecialchars($displayName), htmlspecialchars($resetUrl)],
+                $html
+            );
+
+            $this->mail->Body = $html;
+            $this->mail->AltBody = "Hi {$displayName},\n\n"
+                . "We received a request to reset your password for {$workspaceName}.\n\n"
+                . "Reset your password: {$resetUrl}\n\n"
+                . "This link expires in 1 hour. If you didn't request this, you can ignore this email.";
+
+            $this->mail->send();
+
+            return ['sent' => true, 'error' => null];
+        } catch (\Exception $e) {
+            error_log('Mailer error (password reset): ' . $this->mail->ErrorInfo);
+            return ['sent' => false, 'error' => $this->mail->ErrorInfo];
+        } finally {
+            $this->mail->clearAddresses();
+        }
+    }
 }
