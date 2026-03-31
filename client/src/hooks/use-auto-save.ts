@@ -1,8 +1,7 @@
+import { useState, useRef, useCallback, useEffect } from "react";
+import { apiPut } from "@/lib/api";
 
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { apiPut } from '@/lib/api';
-
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 interface UseAutoSaveOptions {
   taskId: string;
@@ -19,9 +18,9 @@ interface UseAutoSaveReturn {
 export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
   const { taskId, enabled = true } = options;
 
-  const [status, setStatus] = useState<SaveStatus>('idle');
+  const [status, setStatus] = useState<SaveStatus>("idle");
   const [error, setError] = useState<string | null>(null);
-  const savedTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -33,7 +32,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
   }, []);
 
   const clearError = useCallback(() => {
-    setStatus('idle');
+    setStatus("idle");
     setError(null);
   }, []);
 
@@ -51,7 +50,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
       }
 
       // Set status to saving
-      setStatus('saving');
+      setStatus("saving");
       setError(null);
 
       try {
@@ -59,22 +58,22 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
         await apiPut(`/tasks/${taskId}`, { [fieldName]: value });
 
         // Success: set to saved, then auto-reset to idle after 2 seconds
-        setStatus('saved');
+        setStatus("saved");
         savedTimerRef.current = setTimeout(() => {
-          setStatus('idle');
+          setStatus("idle");
           savedTimerRef.current = null;
         }, 2000);
       } catch (err: any) {
         // Error: set error status and store message
-        const errorMessage = err.message || 'Failed to save';
-        setStatus('error');
+        const errorMessage = err.message || "Failed to save";
+        setStatus("error");
         setError(errorMessage);
 
         // Re-throw so caller can handle revert
         throw err;
       }
     },
-    [taskId, enabled]
+    [taskId, enabled],
   );
 
   return {

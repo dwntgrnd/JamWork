@@ -1,23 +1,25 @@
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string
-  ) {
+  status: number;
+  constructor(status: number, message: string) {
     super(message);
-    this.name = 'ApiError';
+    this.status = status;
+    this.name = "ApiError";
   }
 }
 
-async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
   const url = `${API_URL}${path}`;
 
   const response = await fetch(url, {
     ...options,
-    credentials: 'include',
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...options.headers,
     },
   });
@@ -38,23 +40,23 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  return apiFetch<T>(path, { method: 'GET' });
+  return apiFetch<T>(path, { method: "GET" });
 }
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   return apiFetch<T>(path, {
-    method: 'POST',
+    method: "POST",
     body: body ? JSON.stringify(body) : undefined,
   });
 }
 
 export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
   return apiFetch<T>(path, {
-    method: 'PUT',
+    method: "PUT",
     body: body ? JSON.stringify(body) : undefined,
   });
 }
 
 export async function apiDelete<T>(path: string): Promise<T> {
-  return apiFetch<T>(path, { method: 'DELETE' });
+  return apiFetch<T>(path, { method: "DELETE" });
 }
