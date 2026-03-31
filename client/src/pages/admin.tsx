@@ -101,12 +101,15 @@ export default function AdminPage() {
     setInviteLoading(true);
 
     try {
-      const response = await apiPost<{ user: User; temporaryPassword: string; message: string }>('/admin/invite', {
+      const response = await apiPost<{ user: User; temporaryPassword: string; emailSent: boolean; message: string }>('/admin/invite', {
         email,
         displayName,
       });
 
-      setInviteSuccess(`User invited. Temporary password: ${response.temporaryPassword}`);
+      const emailStatus = response.emailSent
+        ? 'Invitation email sent.'
+        : 'Email could not be sent — share the credentials manually.';
+      setInviteSuccess(`User created. Temporary password: ${response.temporaryPassword}\n${emailStatus}`);
       setEmail('');
       setDisplayName('');
 
@@ -380,7 +383,20 @@ export default function AdminPage() {
                 )}
 
                 {inviteSuccess && (
-                  <div className="text-sm text-success">{inviteSuccess}</div>
+                  <div className="space-y-1">
+                    {inviteSuccess.split('\n').map((line, i) => (
+                      <div
+                        key={i}
+                        className={`text-sm ${
+                          line.includes('could not be sent')
+                            ? 'text-warning-foreground'
+                            : 'text-success'
+                        }`}
+                      >
+                        {line}
+                      </div>
+                    ))}
+                  </div>
                 )}
 
                 <Button type="submit" disabled={inviteLoading}>

@@ -27,7 +27,7 @@ class RateLimitMiddleware implements MiddlewareInterface
 
     public static function loginLimiter(): self
     {
-        return new self(10, 900); // 10 requests per 15 minutes
+        return new self(20, 900); // 10 requests per 15 minutes
     }
 
     public static function generalLimiter(): self

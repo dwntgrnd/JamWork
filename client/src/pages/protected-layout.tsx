@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { Sidebar } from '@/components/sidebar';
+import { JamWorkIcon } from '@/components/jamwork-icon';
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal';
 import { Button } from '@/components/ui/button';
 import {
@@ -120,7 +121,10 @@ export default function ProtectedLayout() {
               {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </Button>
 
-            <h1 className="text-xl sm:text-2xl font-bold">{workspaceName}</h1>
+            <div className="flex items-center gap-2">
+              <JamWorkIcon className="h-6 w-6 sm:h-7 sm:w-7" />
+              <h1 className="text-xl sm:text-2xl font-bold">{workspaceName}</h1>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
