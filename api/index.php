@@ -5,6 +5,7 @@ require __DIR__ . '/vendor/autoload.php';
 date_default_timezone_set('UTC');
 
 use Dotenv\Dotenv;
+use JamWork\Middleware\NoCacheMiddleware;
 use JamWork\Middleware\RateLimitMiddleware;
 use JamWork\Routes\AdminRoutes;
 use JamWork\Routes\AuthRoutes;
@@ -28,6 +29,7 @@ $app = AppFactory::create();
 $app->setBasePath('/api');
 
 // Middleware stack (executes bottom-to-top)
+$app->add(new NoCacheMiddleware());
 $app->addBodyParsingMiddleware();
 $app->add(RateLimitMiddleware::generalLimiter());
 $app->addRoutingMiddleware();
