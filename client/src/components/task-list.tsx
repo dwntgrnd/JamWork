@@ -2,6 +2,8 @@ import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
 import { apiGet, apiPut, apiPost } from "@/lib/api";
 import {
   Task,
+  TaskAssignee,
+  TaskEffort,
   TaskFilterState,
   TaskStatus,
   TaskPriority,
@@ -35,6 +37,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
 import {
   ChevronRight,
   ChevronDown,
@@ -296,10 +303,13 @@ export function TaskList({
     }
   };
 
+  const getFirstName = (displayName?: string) =>
+    displayName?.split(" ")[0] || "?";
+
   const handleInlineEdit = async (
     taskId: string,
-    field: "status" | "priority",
-    value: string,
+    field: "status" | "priority" | "effort" | "dueDate" | "assigneeIds",
+    value: string | number | null | string[],
   ) => {
     const fieldKey = `${taskId}-${field}`;
     setSavingFields((prev) => new Set(prev).add(fieldKey));
@@ -316,9 +326,24 @@ export function TaskList({
       } else {
         // Optimistic update for instant visual feedback
         setTasks((prev) =>
-          prev.map((task) =>
-            task.id === taskId ? { ...task, [field]: value } : task,
-          ),
+          prev.map((task) => {
+            if (task.id !== taskId) return task;
+            if (field === "assigneeIds") {
+              const ids = value as string[];
+              const assignees: TaskAssignee[] = ids.map((uid) => {
+                const u = users.find((u) => u.id === uid);
+                return {
+                  id: uid,
+                  taskId,
+                  userId: uid,
+                  assignedAt: new Date().toISOString(),
+                  user: u,
+                };
+              });
+              return { ...task, assignees };
+            }
+            return { ...task, [field]: value };
+          }),
         );
         // Silent re-fetch to re-apply server-side filters and sort order
         await fetchTasks({ silent: true });
@@ -627,15 +652,15 @@ export function TaskList({
                   />
                 </TableHead>
                 <TableHead className="w-8"></TableHead>
-                <TableHead>Title</TableHead>
+                <TableHead className="w-[35%]">Title</TableHead>
                 {showProjectColumn && (
                   <TableHead className="w-36 hidden lg:table-cell">
                     Project
                   </TableHead>
                 )}
                 <TableHead className="w-32">Status</TableHead>
-                <TableHead className="w-32">Priority</TableHead>
-                <TableHead className="w-16 hidden lg:table-cell">
+                <TableHead className="w-24">Priority</TableHead>
+                <TableHead className="w-20 hidden lg:table-cell">
                   Effort
                 </TableHead>
                 <TableHead className="w-24 hidden sm:table-cell">
@@ -748,7 +773,7 @@ export function TaskList({
                             </TableCell>
 
                             {/* Title */}
-                            <TableCell className="max-w-0">
+                            <TableCell className="max-w-0 w-[35%]">
                               <div className="flex items-center gap-2">
                                 <span
                                   className="text-left hover:text-interactive text-sm font-semibold truncate"
@@ -926,76 +951,228 @@ export function TaskList({
                               </div>
                             </TableCell>
 
-                            {/* Effort */}
+                            {/* Effort - inline editable */}
                             <TableCell className="hidden lg:table-cell">
-                              {task.effort ? (
-                                <span
-                                  className={cn(
-                                    getEffortBadgeClasses(task.effort),
-                                  )}
+                              <div
+                                className="flex items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Select
+                                  value={
+                                    task.effort ? task.effort.toString() : "none"
+                                  }
+                                  onValueChange={(v) =>
+                                    handleInlineEdit(
+                                      task.id,
+                                      "effort",
+                                      v === "none" ? null : parseInt(v),
+                                    )
+                                  }
                                 >
-                                  {EFFORT_LABELS[task.effort]}
-                                </span>
-                              ) : (
-                                <span className="text-sm text-muted-foreground/50">
-                                  &mdash;
-                                </span>
-                              )}
-                            </TableCell>
-
-                            {/* Assignees */}
-                            <TableCell className="hidden sm:table-cell">
-                              {task.assignees && task.assignees.length > 0 ? (
-                                <div className="flex items-center gap-2">
-                                  <div className="flex -space-x-2">
-                                    {task.assignees
-                                      .slice(0, 3)
-                                      .map((assignee) => (
-                                        <div
-                                          key={assignee.id}
-                                          className={cn(
-                                            "h-6 w-6 rounded-full text-white text-[10px] font-medium flex items-center justify-center border-2 border-background ring-1 ring-border/50",
-                                            getAvatarColor(
-                                              assignee.id || assignee.userId,
-                                            ),
-                                          )}
-                                          title={assignee.user?.displayName}
-                                        >
-                                          {assignee.user?.displayName?.[0]?.toUpperCase()}
-                                        </div>
-                                      ))}
-                                  </div>
-                                  {task.assignees.length > 3 && (
-                                    <span className="text-xs text-muted-foreground font-medium ml-1">
-                                      +{task.assignees.length - 3}
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-sm text-muted-foreground/50">
-                                  &mdash;
-                                </span>
-                              )}
-                            </TableCell>
-
-                            {/* Due Date */}
-                            <TableCell className="hidden md:table-cell">
-                              {(() => {
-                                const urgency = getDateUrgencyInfo(
-                                  task.dueDate,
-                                  task.status,
-                                );
-                                return (
-                                  <span
+                                  <SelectTrigger
                                     className={cn(
-                                      "text-xs whitespace-nowrap",
-                                      urgency.className,
+                                      "h-7 w-auto min-w-0 gap-0.5 px-2 border-none text-xs",
+                                      task.effort
+                                        ? getEffortBadgeClasses(task.effort)
+                                        : "text-muted-foreground/50",
                                     )}
                                   >
-                                    {urgency.label}
-                                  </span>
-                                );
-                              })()}
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    <SelectItem value="1">
+                                      {EFFORT_LABELS[1]}
+                                    </SelectItem>
+                                    <SelectItem value="2">
+                                      {EFFORT_LABELS[2]}
+                                    </SelectItem>
+                                    <SelectItem value="4">
+                                      {EFFORT_LABELS[4]}
+                                    </SelectItem>
+                                    <SelectItem value="8">
+                                      {EFFORT_LABELS[8]}
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                {savingFields.has(`${task.id}-effort`) && (
+                                  <Check className="h-3 w-3 text-success" />
+                                )}
+                              </div>
+                            </TableCell>
+
+                            {/* Assignees - inline editable */}
+                            <TableCell className="hidden sm:table-cell">
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      className={cn(
+                                        "flex items-center gap-1 text-sm h-7 px-1 rounded hover:bg-muted/50 transition-colors",
+                                        task.assignees &&
+                                          task.assignees.length > 0
+                                          ? "text-foreground"
+                                          : "text-muted-foreground/50",
+                                      )}
+                                    >
+                                      {task.assignees &&
+                                      task.assignees.length > 0 ? (
+                                        <span className="truncate max-w-[80px]">
+                                          {getFirstName(
+                                            task.assignees[0]?.user
+                                              ?.displayName,
+                                          )}
+                                          {task.assignees.length > 1 && (
+                                            <span className="text-muted-foreground ml-1">
+                                              +{task.assignees.length - 1}
+                                            </span>
+                                          )}
+                                        </span>
+                                      ) : (
+                                        <span>&mdash;</span>
+                                      )}
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                    className="w-52 p-2"
+                                    align="start"
+                                  >
+                                    <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                                      {users.map((u) => {
+                                        const isAssigned =
+                                          task.assignees?.some(
+                                            (a) => a.userId === u.id,
+                                          ) || false;
+                                        return (
+                                          <label
+                                            key={u.id}
+                                            className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/50 rounded cursor-pointer text-sm"
+                                          >
+                                            <Checkbox
+                                              checked={isAssigned}
+                                              onCheckedChange={() => {
+                                                const currentIds =
+                                                  task.assignees?.map(
+                                                    (a) => a.userId,
+                                                  ) || [];
+                                                const newIds = isAssigned
+                                                  ? currentIds.filter(
+                                                      (id) => id !== u.id,
+                                                    )
+                                                  : [...currentIds, u.id];
+                                                handleInlineEdit(
+                                                  task.id,
+                                                  "assigneeIds",
+                                                  newIds,
+                                                );
+                                              }}
+                                            />
+                                            <span>{u.displayName}</span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                    {task.assignees &&
+                                      task.assignees.length > 0 && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="w-full mt-1 text-xs text-muted-foreground"
+                                          onClick={() =>
+                                            handleInlineEdit(
+                                              task.id,
+                                              "assigneeIds",
+                                              [],
+                                            )
+                                          }
+                                        >
+                                          Clear all
+                                        </Button>
+                                      )}
+                                  </PopoverContent>
+                                </Popover>
+                                {savingFields.has(
+                                  `${task.id}-assigneeIds`,
+                                ) && (
+                                  <Check className="h-3 w-3 text-success inline-block ml-1" />
+                                )}
+                              </div>
+                            </TableCell>
+
+                            {/* Due Date - inline editable */}
+                            <TableCell className="hidden md:table-cell">
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button className="text-left h-7 px-1 rounded hover:bg-muted/50 transition-colors">
+                                      {(() => {
+                                        const urgency = getDateUrgencyInfo(
+                                          task.dueDate,
+                                          task.status,
+                                        );
+                                        return (
+                                          <span
+                                            className={cn(
+                                              "text-xs whitespace-nowrap",
+                                              urgency.className,
+                                            )}
+                                          >
+                                            {urgency.label}
+                                          </span>
+                                        );
+                                      })()}
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                    className="w-auto p-3"
+                                    align="start"
+                                  >
+                                    <div className="flex flex-col gap-2">
+                                      <Input
+                                        type="date"
+                                        value={
+                                          task.dueDate
+                                            ? new Date(task.dueDate)
+                                                .toISOString()
+                                                .split("T")[0]
+                                            : ""
+                                        }
+                                        onChange={(e) =>
+                                          handleInlineEdit(
+                                            task.id,
+                                            "dueDate",
+                                            e.target.value
+                                              ? new Date(
+                                                  e.target.value,
+                                                ).toISOString()
+                                              : null,
+                                          )
+                                        }
+                                        className="h-8 text-sm"
+                                      />
+                                      {task.dueDate && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-xs text-muted-foreground"
+                                          onClick={() =>
+                                            handleInlineEdit(
+                                              task.id,
+                                              "dueDate",
+                                              null,
+                                            )
+                                          }
+                                        >
+                                          Clear
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                                {savingFields.has(`${task.id}-dueDate`) && (
+                                  <Check className="h-3 w-3 text-success inline-block ml-1" />
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         )}
