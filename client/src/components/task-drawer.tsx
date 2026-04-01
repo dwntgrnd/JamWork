@@ -4,7 +4,6 @@ import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
 import {
   Task,
   Project,
-  Label,
   Subtask,
   TaskLink,
   TaskStatus,
@@ -13,7 +12,6 @@ import {
   RecurrenceType,
   STATUS_LABELS,
   PRIORITY_LABELS,
-  EFFORT_LABELS,
   UserSummary,
   Sprint,
 } from '@/types';
@@ -44,7 +42,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
 import {
   Check,
   X,
@@ -101,9 +98,6 @@ export function TaskDrawer({
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>(
     task?.assignees?.map((a) => a.userId) || []
   );
-  const [selectedLabels, setSelectedLabels] = useState<string[]>(
-    task?.labels?.map((l) => l.labelId) || []
-  );
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks || []);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [links, setLinks] = useState<TaskLink[]>(task?.links || []);
@@ -118,9 +112,6 @@ export function TaskDrawer({
   const [error, setError] = useState('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
-  const [showNewLabelForm, setShowNewLabelForm] = useState(false);
-  const [newLabelName, setNewLabelName] = useState('');
-  const [newLabelColor, setNewLabelColor] = useState('#3b82f6');
   const [showNewProjectForm, setShowNewProjectForm] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [creatingProject, setCreatingProject] = useState(false);
@@ -128,7 +119,6 @@ export function TaskDrawer({
   // Data fetching state
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<UserSummary[]>([]);
-  const [labels, setLabels] = useState<Label[]>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
 
   // Auto-save hook (edit mode only)
@@ -140,7 +130,6 @@ export function TaskDrawer({
   useEffect(() => {
     fetchProjects();
     fetchUsers();
-    fetchLabels();
     fetchSprints();
   }, []);
 
@@ -159,15 +148,6 @@ export function TaskDrawer({
       setUsers(data.users);
     } catch (err) {
       console.error('Failed to fetch users:', err);
-    }
-  };
-
-  const fetchLabels = async () => {
-    try {
-      const data = await apiGet<{ labels: Label[] }>('/labels');
-      setLabels(data.labels);
-    } catch (err) {
-      console.error('Failed to fetch labels:', err);
     }
   };
 
@@ -198,13 +178,12 @@ export function TaskDrawer({
         dueDate ||
         startDate ||
         recurrence ||
-        selectedAssignees.length > 0 ||
-        selectedLabels.length > 0
+        selectedAssignees.length > 0
       );
     }
     // For edit mode: no unsaved changes check needed (auto-save)
     return false;
-  }, [title, description, dueDate, startDate, recurrence, selectedAssignees, selectedLabels, mode]);
+  }, [title, description, dueDate, startDate, recurrence, selectedAssignees, mode]);
 
   const handleClose = () => {
     if (mode === 'create' && hasUnsavedChanges) {
@@ -330,19 +309,6 @@ export function TaskDrawer({
     }
   };
 
-  const handleToggleLabel = async (labelId: string) => {
-    const prev = [...selectedLabels];
-    const next = prev.includes(labelId) ? prev.filter(id => id !== labelId) : [...prev, labelId];
-    setSelectedLabels(next);
-    if (mode === 'edit') {
-      try {
-        await saveField('labelIds', next);
-      } catch {
-        setSelectedLabels(prev);
-      }
-    }
-  };
-
   const handleProjectChange = async (newProjectId: string) => {
     if (mode === 'edit' && task) {
       const prev = projectId;
@@ -431,7 +397,6 @@ export function TaskDrawer({
         recurrence: recurrence || undefined,
         sprintId: sprintId || undefined,
         assigneeIds: selectedAssignees,
-        labelIds: selectedLabels,
       };
 
       if (mode === 'create') {
@@ -546,36 +511,6 @@ export function TaskDrawer({
     }
   };
 
-  const handleCreateLabel = async () => {
-    if (!newLabelName.trim()) return;
-
-    try {
-      const data = await apiPost<{ label: Label }>('/labels', {
-        name: newLabelName.trim(),
-        color: newLabelColor,
-      });
-
-      setLabels([...labels, data.label]);
-      const newLabelIds = [...selectedLabels, data.label.id];
-      setSelectedLabels(newLabelIds);
-      setShowNewLabelForm(false);
-      setNewLabelName('');
-      setNewLabelColor('#3b82f6');
-
-      // Auto-save the new label selection in edit mode
-      if (mode === 'edit') {
-        try {
-          await saveField('labelIds', newLabelIds);
-        } catch {
-          // Revert: remove the label we just added from selection
-          setSelectedLabels(selectedLabels);
-        }
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to create label');
-    }
-  };
-
   const completedSubtasksCount = subtasks.filter((s) => s.completed).length;
 
   return (
@@ -591,363 +526,293 @@ export function TaskDrawer({
             </SheetTitle>
           </SheetHeader>
 
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="space-y-5">
               {/* === IDENTITY GROUP === */}
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {/* Editable title heading */}
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  onBlur={mode === 'edit' ? handleTitleBlur : undefined}
-                  placeholder={mode === 'create' ? 'Task title' : 'Untitled task'}
-                  maxLength={200}
-                  autoFocus
-                  aria-label="Task title"
-                  className="w-full text-lg font-semibold text-foreground bg-transparent border-0 outline-none ring-0 px-0 py-1 placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/20 focus:rounded-md focus:px-2 focus:-mx-2 transition-all"
-                />
+                <div className="bg-field-bg rounded-lg border border-field-border hover:bg-field-bg/80 transition-colors">
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    onBlur={mode === 'edit' ? handleTitleBlur : undefined}
+                    placeholder={mode === 'create' ? 'Task title' : 'Untitled task'}
+                    maxLength={200}
+                    autoFocus
+                    aria-label="Task title"
+                    className="w-full text-xl font-semibold text-foreground bg-transparent border-0 outline-none ring-0 px-3 py-2.5 placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-ring/20 focus:rounded-lg transition-all"
+                  />
+                </div>
 
                 {/* Always-visible auto-growing description */}
-                <textarea
-                  value={description}
-                  onChange={(e) => {
-                    setDescription(e.target.value);
-                    // Auto-grow: reset height then set to scrollHeight
-                    e.target.style.height = 'auto';
-                    e.target.style.height = e.target.scrollHeight + 'px';
-                  }}
-                  onBlur={mode === 'edit' ? handleDescriptionBlur : undefined}
-                  placeholder="Add a description..."
-                  maxLength={5000}
-                  aria-label="Task description"
-                  className="w-full min-h-[80px] text-sm text-foreground bg-transparent border-0 outline-none ring-0 px-0 py-1 resize-none placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring/20 focus:rounded-md focus:px-2 focus:-mx-2 transition-all"
-                  ref={(el) => {
-                    // Set initial height on mount based on content
-                    if (el) {
-                      el.style.height = 'auto';
-                      el.style.height = el.scrollHeight + 'px';
-                    }
-                  }}
-                />
+                <div className="bg-field-bg rounded-lg border border-field-border hover:bg-field-bg/80 transition-colors">
+                  <textarea
+                    value={description}
+                    onChange={(e) => {
+                      setDescription(e.target.value);
+                      // Auto-grow: reset height then set to scrollHeight
+                      e.target.style.height = 'auto';
+                      e.target.style.height = e.target.scrollHeight + 'px';
+                    }}
+                    onBlur={mode === 'edit' ? handleDescriptionBlur : undefined}
+                    placeholder="What needs to be done?"
+                    maxLength={5000}
+                    aria-label="Task description"
+                    className="w-full min-h-[80px] text-sm text-foreground bg-transparent border-0 outline-none ring-0 px-3 py-2.5 resize-none placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-ring/20 focus:rounded-lg transition-all"
+                    ref={(el) => {
+                      // Set initial height on mount based on content
+                      if (el) {
+                        el.style.height = 'auto';
+                        el.style.height = el.scrollHeight + 'px';
+                      }
+                    }}
+                  />
+                </div>
               </div>
 
-              {/* Group separator */}
-              <div className="pt-4">
-                <h3 className="text-[13px] font-medium text-muted-foreground uppercase tracking-wider mb-3">Workflow</h3>
-              </div>
-
-              {/* === WORKFLOW GROUP === */}
-              <div className="bg-muted/30 rounded-lg divide-y divide-border/50">
-                {/* Project - show in edit mode OR in create mode without initial project */}
-                {(mode === 'edit' || (mode === 'create' && !initialProjectId)) && (
-                  <div className="px-1">
-                    <div className="flex items-center justify-between h-9">
-                      <span className="text-[13px] text-muted-foreground">
-                        Project {mode === 'create' && !initialProjectId && <span className="text-destructive">*</span>}
-                      </span>
+              {/* === WORKFLOW GROUP — 2-column grid === */}
+              <div>
+                <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Workflow</h3>
+                <div className="grid grid-cols-2 gap-2.5">
+                    {/* Status */}
+                    <div className="bg-field-bg rounded-md border border-field-border p-2">
+                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Status</span>
                       <Select
-                        value={projectId}
-                        onValueChange={(v) => {
-                          if (v === '__new__') {
-                            setShowNewProjectForm(true);
-                          } else {
-                            handleProjectChange(v);
-                          }
-                        }}
+                        value={status}
+                        onValueChange={(v) => handleStatusChange(v as TaskStatus)}
                       >
-                        <SelectTrigger className="w-55 h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 justify-end gap-1">
-                          <SelectValue placeholder="Select project" />
+                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {projects.map((project) => (
-                            <SelectItem key={project.id} value={project.id}>
-                              {project.name}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="__new__" className="text-interactive font-medium">
-                            <Plus className="h-3 w-3 inline mr-1" />
-                            New Project
-                          </SelectItem>
+                          <SelectItem value="todo">{STATUS_LABELS.todo}</SelectItem>
+                          <SelectItem value="in_progress">{STATUS_LABELS.in_progress}</SelectItem>
+                          <SelectItem value="review">{STATUS_LABELS.review}</SelectItem>
+                          <SelectItem value="done">{STATUS_LABELS.done}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    {showNewProjectForm && (
-                      <div className="flex items-center gap-2 pb-2">
-                        <Input
-                          placeholder="Project name"
-                          value={newProjectName}
-                          onChange={(e) => setNewProjectName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleCreateProject();
-                            }
-                            if (e.key === 'Escape') {
-                              setShowNewProjectForm(false);
-                              setNewProjectName('');
+
+                    {/* Priority */}
+                    <div className="bg-field-bg rounded-md border border-field-border p-2">
+                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Priority</span>
+                      <Select
+                        value={priority}
+                        onValueChange={(v) => handlePriorityChange(v as TaskPriority)}
+                      >
+                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">{PRIORITY_LABELS.low}</SelectItem>
+                          <SelectItem value="medium">{PRIORITY_LABELS.medium}</SelectItem>
+                          <SelectItem value="high">{PRIORITY_LABELS.high}</SelectItem>
+                          <SelectItem value="urgent">{PRIORITY_LABELS.urgent}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Effort */}
+                    <div className="bg-field-bg rounded-md border border-field-border p-2">
+                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Effort</span>
+                      <Select
+                        value={effort?.toString() || 'none'}
+                        onValueChange={(v) => handleEffortChange(v === 'none' ? null : parseInt(v) as TaskEffort)}
+                      >
+                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="1">S - Small</SelectItem>
+                          <SelectItem value="2">M - Medium</SelectItem>
+                          <SelectItem value="4">L - Large</SelectItem>
+                          <SelectItem value="8">XL - Extra Large</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Sprint */}
+                    <div className="bg-field-bg rounded-md border border-field-border p-2">
+                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Sprint</span>
+                      <Select
+                        value={sprintId || 'none'}
+                        onValueChange={handleSprintChange}
+                      >
+                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="backlog">Backlog</SelectItem>
+                          {filteredSprints.map((sprint) => (
+                            <SelectItem key={sprint.id} value={sprint.id}>
+                              <span className={sprint.status === 'active' ? 'font-semibold text-primary' : ''}>
+                                {sprint.name}
+                                {sprint.status === 'active' && ' (Active)'}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Start Date */}
+                    <div className="bg-field-bg rounded-md border border-field-border p-2">
+                      <label htmlFor="start-date" className="text-[11px] text-muted-foreground uppercase tracking-wider">Start</label>
+                      <Input
+                        id="start-date"
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => handleStartDateChange(e.target.value)}
+                        className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5"
+                      />
+                    </div>
+
+                    {/* Due Date */}
+                    <div className="bg-field-bg rounded-md border border-field-border p-2">
+                      <label htmlFor="due-date" className="text-[11px] text-muted-foreground uppercase tracking-wider">Due</label>
+                      <Input
+                        id="due-date"
+                        type="date"
+                        value={dueDate}
+                        onChange={(e) => handleDueDateChange(e.target.value)}
+                        className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5"
+                      />
+                    </div>
+
+                    {/* Recurrence */}
+                    <div className="bg-field-bg rounded-md border border-field-border p-2">
+                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Recurrence</span>
+                      <Select
+                        value={recurrence || 'none'}
+                        onValueChange={(v) => handleRecurrenceChange(v === 'none' ? null : v as RecurrenceType)}
+                      >
+                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="biweekly">Biweekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {recurrence && (
+                        <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                          Repeats {recurrence} after completion
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Project */}
+                    {(mode === 'edit' || (mode === 'create' && !initialProjectId)) && (
+                      <div className="bg-field-bg rounded-md border border-field-border p-2">
+                        <span className="text-[11px] text-muted-foreground uppercase tracking-wider">
+                          Project {mode === 'create' && !initialProjectId && <span className="text-destructive">*</span>}
+                        </span>
+                        <Select
+                          value={projectId}
+                          onValueChange={(v) => {
+                            if (v === '__new__') {
+                              setShowNewProjectForm(true);
+                            } else {
+                              handleProjectChange(v);
                             }
                           }}
-                          className="flex-1 h-8 text-sm"
-                          autoFocus
-                          disabled={creatingProject}
-                        />
-                        <Button
-                          size="sm"
-                          className="h-8"
-                          onClick={handleCreateProject}
-                          disabled={!newProjectName.trim() || creatingProject}
                         >
-                          {creatingProject ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            'Save'
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => {
-                            setShowNewProjectForm(false);
-                            setNewProjectName('');
-                          }}
-                          disabled={creatingProject}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
+                          <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
+                            <SelectValue placeholder="Select project" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {projects.map((project) => (
+                              <SelectItem key={project.id} value={project.id}>
+                                {project.name}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="__new__" className="text-interactive font-medium">
+                              <Plus className="h-3 w-3 inline mr-1" />
+                              New Project
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {showNewProjectForm && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <Input
+                              placeholder="Project name"
+                              value={newProjectName}
+                              onChange={(e) => setNewProjectName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleCreateProject();
+                                }
+                                if (e.key === 'Escape') {
+                                  setShowNewProjectForm(false);
+                                  setNewProjectName('');
+                                }
+                              }}
+                              className="flex-1 h-8 text-sm"
+                              autoFocus
+                              disabled={creatingProject}
+                            />
+                            <Button
+                              size="sm"
+                              className="h-8"
+                              onClick={handleCreateProject}
+                              disabled={!newProjectName.trim() || creatingProject}
+                            >
+                              {creatingProject ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                'Save'
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => {
+                                setShowNewProjectForm(false);
+                                setNewProjectName('');
+                              }}
+                              disabled={creatingProject}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* Sprint */}
-                <div className="flex items-center justify-between h-9 px-1">
-                  <span className="text-[13px] text-muted-foreground">Sprint</span>
-                  <Select
-                    value={sprintId || 'none'}
-                    onValueChange={handleSprintChange}
-                  >
-                    <SelectTrigger className="w-55 h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 justify-end gap-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="backlog">Backlog</SelectItem>
-                      {filteredSprints.map((sprint) => (
-                        <SelectItem key={sprint.id} value={sprint.id}>
-                          <span className={sprint.status === 'active' ? 'font-semibold text-primary' : ''}>
-                            {sprint.name}
-                            {sprint.status === 'active' && ' (Active)'}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
+              </div>
 
-                {/* Status */}
-                <div className="flex items-center justify-between h-9 px-1">
-                  <span className="text-[13px] text-muted-foreground">Status</span>
-                  <Select
-                    value={status}
-                    onValueChange={(v) => handleStatusChange(v as TaskStatus)}
-                  >
-                    <SelectTrigger className="w-55 h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 justify-end gap-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todo">{STATUS_LABELS.todo}</SelectItem>
-                      <SelectItem value="in_progress">
-                        {STATUS_LABELS.in_progress}
-                      </SelectItem>
-                      <SelectItem value="review">{STATUS_LABELS.review}</SelectItem>
-                      <SelectItem value="done">{STATUS_LABELS.done}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Priority */}
-                <div className="flex items-center justify-between h-9 px-1">
-                  <span className="text-[13px] text-muted-foreground">Priority</span>
-                  <Select
-                    value={priority}
-                    onValueChange={(v) => handlePriorityChange(v as TaskPriority)}
-                  >
-                    <SelectTrigger className="w-55 h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 justify-end gap-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">{PRIORITY_LABELS.low}</SelectItem>
-                      <SelectItem value="medium">{PRIORITY_LABELS.medium}</SelectItem>
-                      <SelectItem value="high">{PRIORITY_LABELS.high}</SelectItem>
-                      <SelectItem value="urgent">{PRIORITY_LABELS.urgent}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Effort */}
-                <div className="flex items-center justify-between h-9 px-1">
-                  <span className="text-[13px] text-muted-foreground">Effort</span>
-                  <Select
-                    value={effort?.toString() || 'none'}
-                    onValueChange={(v) => handleEffortChange(v === 'none' ? null : parseInt(v) as TaskEffort)}
-                  >
-                    <SelectTrigger className="w-55 h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 justify-end gap-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="1">S - Small</SelectItem>
-                      <SelectItem value="2">M - Medium</SelectItem>
-                      <SelectItem value="4">L - Large</SelectItem>
-                      <SelectItem value="8">XL - Extra Large</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Dates */}
-                <div className="flex items-center justify-between h-9 px-1">
-                  <span className="text-[13px] text-muted-foreground">Dates</span>
-                  <div className="flex gap-2">
-                    <label htmlFor="start-date" className="sr-only">Start date</label>
-                    <Input
-                      id="start-date"
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => handleStartDateChange(e.target.value)}
-                      className="w-[85px] h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50"
-                    />
-                    <span className="text-[13px] text-muted-foreground self-center">-</span>
-                    <label htmlFor="due-date" className="sr-only">Due date</label>
-                    <Input
-                      id="due-date"
-                      type="date"
-                      value={dueDate}
-                      onChange={(e) => handleDueDateChange(e.target.value)}
-                      className="w-[85px] h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50"
-                    />
-                  </div>
-                </div>
-
-                {/* Recurrence */}
-                <div>
-                  <div className="flex items-center justify-between h-9 px-1">
-                    <span className="text-[13px] text-muted-foreground">Recurrence</span>
-                    <Select
-                      value={recurrence || 'none'}
-                      onValueChange={(v) => handleRecurrenceChange(v === 'none' ? null : v as RecurrenceType)}
+              {/* === ASSIGNEES — own section === */}
+              <div>
+                <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Assignees</h3>
+                <div className="flex flex-wrap gap-2">
+                  {users.map((user) => (
+                    <Badge
+                      key={user.id}
+                      variant={
+                        selectedAssignees.includes(user.id) ? 'default' : 'outline'
+                      }
+                      className="cursor-pointer text-sm font-medium"
+                      onClick={() => handleToggleAssignee(user.id)}
                     >
-                      <SelectTrigger className="w-55 h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 justify-end gap-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="biweekly">Biweekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {recurrence && (
-                    <p className="text-[12px] text-muted-foreground/70 mt-0.5 px-1">
-                      Task will repeat {recurrence} after completion
-                    </p>
-                  )}
-                </div>
-
-                {/* Assignees */}
-                <div className="flex items-start justify-between min-h-[36px] px-1 py-1">
-                  <span className="text-[13px] text-muted-foreground pt-1">Assignees</span>
-                  <div className="flex flex-wrap gap-2 max-w-[320px] justify-end">
-                    {users.map((user) => (
-                      <Badge
-                        key={user.id}
-                        variant={
-                          selectedAssignees.includes(user.id) ? 'default' : 'outline'
-                        }
-                        className="cursor-pointer text-sm font-medium"
-                        onClick={() => handleToggleAssignee(user.id)}
-                      >
-                        {selectedAssignees.includes(user.id) && (
-                          <Check className="h-3 w-3 mr-1" />
-                        )}
-                        {user.displayName}
-                      </Badge>
-                    ))}
-                  </div>
+                      {selectedAssignees.includes(user.id) && (
+                        <Check className="h-3 w-3 mr-1" />
+                      )}
+                      {user.displayName}
+                    </Badge>
+                  ))}
                 </div>
               </div>
 
-              {/* Group separator */}
-              <div className="pt-4">
-                <h3 className="text-[13px] font-medium text-muted-foreground uppercase tracking-wider mb-3">Classification</h3>
-              </div>
-
-              {/* === CLASSIFICATION GROUP === */}
+              {/* === SUBTASKS & LINKS === */}
               <div className="space-y-3">
-                {/* Labels */}
-                <div>
-                  <span className="text-[13px] text-muted-foreground">Labels</span>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {labels.map((label) => (
-                      <Badge
-                        key={label.id}
-                        variant="outline"
-                        className="cursor-pointer text-sm font-medium"
-                        style={{
-                          borderColor: label.color,
-                          backgroundColor: selectedLabels.includes(label.id)
-                            ? `${label.color}40`
-                            : 'transparent',
-                        }}
-                        onClick={() => handleToggleLabel(label.id)}
-                      >
-                        {selectedLabels.includes(label.id) && (
-                          <Check className="h-3 w-3 mr-1" />
-                        )}
-                        <div
-                          className="h-2 w-2 rounded-full mr-1"
-                          style={{ backgroundColor: label.color }}
-                        />
-                        {label.name}
-                      </Badge>
-                    ))}
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowNewLabelForm(!showNewLabelForm)}
-                      className="h-6"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      New Label
-                    </Button>
-                  </div>
-
-                  {/* New label form */}
-                  {showNewLabelForm && (
-                    <div className="mt-2 flex gap-2">
-                      <Input
-                        placeholder="Label name"
-                        value={newLabelName}
-                        onChange={(e) => setNewLabelName(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Input
-                        type="color"
-                        value={newLabelColor}
-                        onChange={(e) => setNewLabelColor(e.target.value)}
-                        className="w-16"
-                      />
-                      <Button onClick={handleCreateLabel} size="sm">
-                        Add
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
                 {/* Subtasks (edit mode only) */}
                 {mode === 'edit' && task && (
                   <>
@@ -993,7 +858,8 @@ export function TaskDrawer({
                       </div>
 
                       {/* Add subtask */}
-                      <div className="flex gap-2 mt-2">
+                      <div className="flex items-center gap-2 mt-2 border-b border-dashed border-field-border pb-1">
+                        <Plus className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
                         <Input
                           placeholder="Add a subtask..."
                           value={newSubtaskTitle}
@@ -1004,10 +870,8 @@ export function TaskDrawer({
                               handleAddSubtask();
                             }
                           }}
+                          className="flex-1 h-8 text-sm border-none shadow-none focus-visible:ring-0 bg-transparent placeholder:text-muted-foreground/50"
                         />
-                        <Button onClick={handleAddSubtask} size="sm">
-                          Add
-                        </Button>
                       </div>
                     </div>
                   </>
@@ -1018,7 +882,7 @@ export function TaskDrawer({
               {mode === 'edit' && task && (
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-medium text-muted-foreground">Links</span>
+                    <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Links</span>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1094,7 +958,13 @@ export function TaskDrawer({
 
                   {/* Empty state when no links and form not showing */}
                   {links.length === 0 && !showAddLink && (
-                    <p className="text-xs text-muted-foreground/60 pl-1">No links added</p>
+                    <div
+                      className="flex items-center gap-2 border-b border-dashed border-field-border pb-1 cursor-pointer"
+                      onClick={() => setShowAddLink(true)}
+                    >
+                      <LinkIcon className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+                      <span className="text-sm text-muted-foreground/50">Add a link...</span>
+                    </div>
                   )}
                 </div>
               )}

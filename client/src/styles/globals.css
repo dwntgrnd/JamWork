@@ -68,6 +68,10 @@
   --color-avatar-5: var(--avatar-5);
   --color-avatar-6: var(--avatar-6);
 
+  /* Field container tokens */
+  --color-field-bg: var(--field-bg);
+  --color-field-border: var(--field-border);
+
   /* Project bar token */
   --color-project-bar: var(--project-bar);
 
@@ -156,6 +160,10 @@
 
   /* Ring — teal */
   --ring: oklch(0.76 0.13 192);
+
+  /* Field container tokens — cool gray for form fields */
+  --field-bg: oklch(0.95 0.008 250);
+  --field-border: oklch(0.85 0.012 250);
 
   /* Component surface tokens */
   --input-sheer: transparent;
@@ -301,6 +309,10 @@
 
   /* Ring — teal */
   --ring: oklch(0.76 0.13 192);
+
+  /* Field container tokens — cool gray for form fields */
+  --field-bg: oklch(0.22 0.012 250);
+  --field-border: oklch(0.32 0.015 250);
 
   /* Component surface tokens */
   --input-sheer: oklch(0.30 0.015 265 / 0.3);
