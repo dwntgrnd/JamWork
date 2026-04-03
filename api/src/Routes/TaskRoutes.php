@@ -3,6 +3,7 @@
 namespace JamWork\Routes;
 
 use JamWork\Lib\Database;
+use JamWork\Lib\Mailer;
 use JamWork\Lib\Validator;
 use JamWork\Middleware\AuthMiddleware;
 use JamWork\Models\TaskModel;
@@ -378,6 +379,57 @@ class TaskRoutes
                 } catch (\Exception $e) {
                     $db->rollBack();
                     throw $e;
+                }
+
+                // Send assignment notifications for new task assignees
+                if (!empty($assigneeIds) && Mailer::isConfigured()) {
+                    // Don't notify self-assignment
+                    $addedUserIds = array_diff($assigneeIds, [$userId]);
+
+                    if (!empty($addedUserIds)) {
+                        try {
+                            // Batch lookup added users
+                            $placeholders = implode(',', array_fill(0, count($addedUserIds), '?'));
+                            $stmt = $db->prepare("SELECT id, email, display_name FROM users WHERE id IN ({$placeholders})");
+                            $stmt->execute(array_values($addedUserIds));
+                            $addedUsers = $stmt->fetchAll();
+
+                            // Assigner display name
+                            $stmt = $db->prepare('SELECT display_name FROM users WHERE id = ?');
+                            $stmt->execute([$userId]);
+                            $assignerName = $stmt->fetchColumn() ?: 'Someone';
+
+                            // Project name
+                            $stmt = $db->prepare('SELECT name FROM projects WHERE id = ?');
+                            $stmt->execute([$data['projectId']]);
+                            $projectName = $stmt->fetchColumn() ?: 'Unknown Project';
+
+                            // Workspace name
+                            $stmt = $db->prepare("SELECT value FROM workspace_settings WHERE `key` = 'workspace_name'");
+                            $stmt->execute();
+                            $workspaceName = $stmt->fetchColumn() ?: 'JamWork';
+
+                            $taskUrl = ($_ENV['APP_URL'] ?? '') . '/projects/' . $data['projectId'] . '?task=' . $id;
+
+                            $mailer = new Mailer();
+                            foreach ($addedUsers as $user) {
+                                $result = $mailer->sendTaskAssignmentEmail(
+                                    $user['email'],
+                                    $user['display_name'] ?? '',
+                                    $assignerName,
+                                    $data['title'],
+                                    $projectName,
+                                    $taskUrl,
+                                    $workspaceName
+                                );
+                                if (!$result['sent']) {
+                                    error_log('Task assignment email failed for user ' . $user['id'] . ': ' . $result['error']);
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            error_log('Task assignment notification error: ' . $e->getMessage());
+                        }
+                    }
                 }
 
                 // Re-fetch the created task with all relations
@@ -778,6 +830,60 @@ class TaskRoutes
                 } catch (\Exception $e) {
                     $db->rollBack();
                     throw $e;
+                }
+
+                // Send assignment notifications for newly added assignees
+                if (array_key_exists('assigneeIds', $data) && Mailer::isConfigured()) {
+                    $existingAssigneeIdArray = array_column($existingAssigneeRows, 'user_id');
+                    $newAssigneeIds = $data['assigneeIds'] ?? [];
+                    $addedUserIds = array_diff($newAssigneeIds, $existingAssigneeIdArray);
+                    // Don't notify self-assignment
+                    $addedUserIds = array_diff($addedUserIds, [$userId]);
+
+                    if (!empty($addedUserIds)) {
+                        try {
+                            // Batch lookup added users
+                            $placeholders = implode(',', array_fill(0, count($addedUserIds), '?'));
+                            $stmt = $db->prepare("SELECT id, email, display_name FROM users WHERE id IN ({$placeholders})");
+                            $stmt->execute(array_values($addedUserIds));
+                            $addedUsers = $stmt->fetchAll();
+
+                            // Assigner display name
+                            $stmt = $db->prepare('SELECT display_name FROM users WHERE id = ?');
+                            $stmt->execute([$userId]);
+                            $assignerName = $stmt->fetchColumn() ?: 'Someone';
+
+                            // Project name
+                            $stmt = $db->prepare('SELECT name FROM projects WHERE id = ?');
+                            $stmt->execute([$existingTask['project_id']]);
+                            $projectName = $stmt->fetchColumn() ?: 'Unknown Project';
+
+                            // Workspace name
+                            $stmt = $db->prepare("SELECT value FROM workspace_settings WHERE `key` = 'workspace_name'");
+                            $stmt->execute();
+                            $workspaceName = $stmt->fetchColumn() ?: 'JamWork';
+
+                            $taskUrl = ($_ENV['APP_URL'] ?? '') . '/projects/' . $existingTask['project_id'] . '?task=' . $id;
+
+                            $mailer = new Mailer();
+                            foreach ($addedUsers as $user) {
+                                $result = $mailer->sendTaskAssignmentEmail(
+                                    $user['email'],
+                                    $user['display_name'] ?? '',
+                                    $assignerName,
+                                    $data['title'] ?? $existingTask['title'],
+                                    $projectName,
+                                    $taskUrl,
+                                    $workspaceName
+                                );
+                                if (!$result['sent']) {
+                                    error_log('Task assignment email failed for user ' . $user['id'] . ': ' . $result['error']);
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            error_log('Task assignment notification error: ' . $e->getMessage());
+                        }
+                    }
                 }
 
                 // Re-fetch updated task with full relations

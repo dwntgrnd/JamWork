@@ -115,4 +115,43 @@ class Mailer
             $this->mail->clearAddresses();
         }
     }
+
+    public function sendTaskAssignmentEmail(
+        string $toEmail,
+        string $toDisplayName,
+        string $assignerDisplayName,
+        string $taskTitle,
+        string $projectName,
+        string $taskUrl,
+        string $workspaceName
+    ): array {
+        try {
+            $this->mail->addAddress($toEmail, $toDisplayName);
+            $this->mail->Subject = "{$assignerDisplayName} assigned you a task in {$workspaceName}";
+
+            $templatePath = __DIR__ . '/../Mail/templates/task-assignment.html';
+            $html = file_get_contents($templatePath);
+
+            $html = str_replace(
+                ['{{WORKSPACE_NAME}}', '{{DISPLAY_NAME}}', '{{ASSIGNER_NAME}}', '{{TASK_TITLE}}', '{{PROJECT_NAME}}', '{{TASK_URL}}'],
+                [htmlspecialchars($workspaceName), htmlspecialchars($toDisplayName), htmlspecialchars($assignerDisplayName), htmlspecialchars($taskTitle), htmlspecialchars($projectName), htmlspecialchars($taskUrl)],
+                $html
+            );
+
+            $this->mail->Body = $html;
+            $this->mail->AltBody = "Hi {$toDisplayName},\n\n"
+                . "{$assignerDisplayName} assigned you a task in {$projectName}.\n\n"
+                . "Task: {$taskTitle}\n\n"
+                . "View task: {$taskUrl}";
+
+            $this->mail->send();
+
+            return ['sent' => true, 'error' => null];
+        } catch (\Exception $e) {
+            error_log('Mailer error (task assignment): ' . $this->mail->ErrorInfo);
+            return ['sent' => false, 'error' => $this->mail->ErrorInfo];
+        } finally {
+            $this->mail->clearAddresses();
+        }
+    }
 }
