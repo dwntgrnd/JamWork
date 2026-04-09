@@ -7,9 +7,12 @@ JamWork helps small product teams track tasks, manage sprints, and stay aligned 
 ## Features
 
 - **Task board** with drag-and-drop status tracking (To Do → In Progress → Review → Done)
-- **Sprint management** with backlog grooming and velocity tracking
-- **Project organization** with milestones and team assignment
+- **Timeline view** with sprint overlays, milestones, and adjustable zoom (day/week/month)
+- **Sprint management** with backlog grooming and task migration on close
+- **Project organization** with milestones, labels, and task assignment
+- **Subtasks, recurring tasks, and bulk operations**
 - **Email notifications** for task assignments, team invitations, and password resets
+- **Dark mode** with system preference detection
 - **Multi-user** with role-based access (admin and member roles)
 - **Self-hosted** — your data stays on your server
 
