@@ -66,8 +66,8 @@ export function BoardView({ projectId, filters }: BoardViewProps) {
       }
     }
 
-    // Show completed filter
-    if (!filters.showCompleted && task.status === 'done') return false;
+    // Board view always shows done tasks in the Done column — hiding them makes the column meaningless.
+    // The showCompleted filter is still respected via the column rendering below.
 
     return true;
   });

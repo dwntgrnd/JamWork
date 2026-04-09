@@ -38,7 +38,7 @@ class MilestoneRoutes
                 $projectId = $request->getQueryParams()['projectId'] ?? null;
 
                 if ($projectId !== null) {
-                    $stmt = $db->prepare('SELECT * FROM milestones WHERE project_id = :projectId ORDER BY date ASC');
+                    $stmt = $db->prepare('SELECT * FROM milestones WHERE project_id = :projectId OR project_id IS NULL ORDER BY date ASC');
                     $stmt->execute(['projectId' => $projectId]);
                 } else {
                     $stmt = $db->query('SELECT * FROM milestones ORDER BY date ASC');

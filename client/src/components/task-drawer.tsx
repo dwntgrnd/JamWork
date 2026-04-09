@@ -343,6 +343,7 @@ export function TaskDrawer({
       }
       setNewProjectName('');
       setShowNewProjectForm(false);
+      window.dispatchEvent(new Event('projects-updated'));
     } catch (err: any) {
       setError(err.message || 'Failed to create project');
     } finally {

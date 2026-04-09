@@ -89,23 +89,14 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
       // Build query params based on whether projectId is provided
       const projectQuery = projectId ? `?projectId=${projectId}` : '';
 
-      // Fetch all data in parallel (include projects in global mode)
-      const fetches: Promise<any>[] = [
+      // Fetch all data in parallel
+      const [tasksData, milestonesData, sprintsData, currentUserData, projectsData] = await Promise.all([
         apiGet<{ tasks: Task[] }>(`/tasks${projectQuery}`),
         apiGet<{ milestones: Milestone[] }>(`/milestones${projectQuery}`),
         apiGet<{ sprints: Sprint[] }>(`/sprints${projectQuery}`),
         apiGet<{ user: UserSummary }>('/auth/me'),
-      ];
-      if (!projectId) {
-        fetches.push(apiGet<{ projects: Project[] }>('/projects'));
-      }
-
-      const results = await Promise.all(fetches);
-      const tasksData = results[0] as { tasks: Task[] };
-      const milestonesData = results[1] as { milestones: Milestone[] };
-      const sprintsData = results[2] as { sprints: Sprint[] };
-      const currentUserData = results[3] as { user: UserSummary };
-      const projectsData = results[4] as { projects: Project[] } | undefined;
+        apiGet<{ projects: Project[] }>('/projects'),
+      ]);
 
       // Filter tasks that have at least a due date or start date
       const tasksWithDates = tasksData.tasks.filter(
@@ -113,7 +104,7 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
       );
 
       setTasks(tasksWithDates);
-      setProjects(projectsData?.projects || []);
+      setProjects(projectsData.projects);
       setMilestones(milestonesData.milestones);
       setSprints(sprintsData.sprints);
       setCurrentUserId(currentUserData.user.id);
@@ -169,15 +160,10 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
           date: milestoneForm.date,
         });
       } else {
-        // Create new milestone (only if projectId is provided)
-        if (!projectId) {
-          setMilestoneError('Cannot create milestone in global view');
-          return;
-        }
         await apiPost('/milestones', {
           name: milestoneForm.name.trim(),
           date: milestoneForm.date,
-          projectId,
+          ...(projectId && { projectId }),
         });
       }
 
@@ -554,13 +540,11 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
             </Button>
           </div>
 
-          {/* Add Milestone button (only in project mode) */}
-          {projectId && (
-            <Button variant="outline" size="sm" onClick={handleOpenCreateMilestone}>
-              <Plus className="h-4 w-4 mr-1" />
-              Milestone
-            </Button>
-          )}
+          {/* Add Milestone button */}
+          <Button variant="outline" size="sm" onClick={handleOpenCreateMilestone}>
+            <Plus className="h-4 w-4 mr-1" />
+            Milestone
+          </Button>
 
           {/* Status legend */}
           <div className="flex items-center gap-3 ml-auto">
@@ -709,19 +693,25 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <div className="text-xs space-y-1">
-                              <div className="font-semibold">{milestone.name}</div>
-                              <div className="text-muted-foreground">
+                            <div className="text-xs space-y-1.5 py-0.5">
+                              <div className="font-semibold text-sm">{milestone.name}</div>
+                              <div className="text-background/70">
                                 {new Date(milestone.date).toLocaleDateString()}
                               </div>
-                              <div className="flex items-center gap-1 pt-1 border-t border-border mt-1">
+                              {milestone.projectId && (() => {
+                                const projName = projects.find(p => p.id === milestone.projectId)?.name;
+                                return projName ? (
+                                  <div className="text-interactive/90 text-xs">{projName}</div>
+                                ) : null;
+                              })()}
+                              <div className="flex items-center gap-1.5 pt-1.5 border-t border-background/20 mt-1">
                                 <button
                                   onClick={() => handleOpenEditMilestone(milestone)}
-                                  className="text-xs text-primary hover:underline"
+                                  className="text-xs text-interactive hover:underline"
                                 >
                                   Edit
                                 </button>
-                                <span className="text-muted-foreground">|</span>
+                                <span className="text-background/40">|</span>
                                 <button
                                   onClick={() => setDeleteMilestoneId(milestone.id)}
                                   className="text-xs text-destructive hover:underline"

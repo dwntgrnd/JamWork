@@ -26,7 +26,7 @@ export default function ProtectedLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
-  const [workspaceName, setWorkspaceName] = useState('TeamTask');
+  const [workspaceName, setWorkspaceName] = useState('JamWork');
 
   const handleLogout = async () => {
     await logout();
@@ -57,6 +57,10 @@ export default function ProtectedLayout() {
       window.removeEventListener('workspace-name-updated', handleWorkspaceUpdate as EventListener);
     };
   }, []);
+
+  useEffect(() => {
+    document.title = workspaceName || 'JamWork';
+  }, [workspaceName]);
 
   useKeyboardShortcuts([
     {
