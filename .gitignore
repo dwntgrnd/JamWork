@@ -31,3 +31,9 @@ docker-compose.override.yml
 
 # Local dev docs
 DEV-SETUP.md
+
+# Production env (real credentials — never commit)
+api/.env.production
+
+# Claude Code
+.claude/

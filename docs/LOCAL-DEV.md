@@ -74,7 +74,7 @@ npm install
 npm run dev
 ```
 
-Frontend runs on `http://localhost:5173` and proxies API calls to `http://localhost:8080`.
+Frontend runs on `http://localhost:3000` and proxies API calls to `http://localhost:8080`.
 
 ## Common Commands
 
