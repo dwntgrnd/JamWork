@@ -37,3 +37,6 @@ api/.env.production
 
 # Claude Code
 .claude/
+
+# Release build output
+release/
