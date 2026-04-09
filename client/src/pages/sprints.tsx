@@ -22,7 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Calendar, ChevronDown, ChevronRight, ArrowRight, Archive, Plus, Pencil, X, ArrowUp, ArrowDown } from 'lucide-react';
+import { Calendar, Check, ChevronDown, ChevronRight, ArrowRight, Archive, Plus, Pencil, X, ArrowUp, ArrowDown } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
 import { getStatusPillClasses, formatStatusLabel, getPriorityDotColor } from '@/lib/style-tokens';
 import { Textarea } from '@/components/ui/textarea';
@@ -79,6 +80,14 @@ export default function GlobalSprintsPage() {
   const [editEndDate, setEditEndDate] = useState('');
   const [editError, setEditError] = useState('');
 
+  // Close sprint dialog state
+  const [closingSprint, setClosingSprint] = useState<SprintWithTasks | null>(null);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const [closeAction, setCloseAction] = useState<'backlog' | 'next_sprint'>('backlog');
+  const [closeNextSprintId, setCloseNextSprintId] = useState('');
+  const [closeError, setCloseError] = useState('');
+  const [closeLoading, setCloseLoading] = useState(false);
+
   // Backlog filter/sort state
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [backlogFilters, setBacklogFilters] = useState<{
@@ -120,12 +129,6 @@ export default function GlobalSprintsPage() {
       ]);
       setSprints(sprintData.sprints);
       setBacklogTasks(taskData.tasks);
-
-      // Expand active sprints by default
-      const activeSprintIds = sprintData.sprints
-        .filter((s) => s.status === 'active')
-        .map((s) => s.id);
-      setExpandedSprintIds(new Set(activeSprintIds));
 
       // Clear selection after data refresh
       setSelectedTaskIds(new Set());
@@ -200,6 +203,46 @@ export default function GlobalSprintsPage() {
     setEditEndDate(new Date(sprint.endDate).toISOString().split('T')[0]);
     setEditError('');
     setShowEditDialog(true);
+  };
+
+  const handleOpenCloseDialog = (sprint: SprintWithTasks) => {
+    setClosingSprint(sprint);
+    setCloseAction('backlog');
+    setCloseNextSprintId('');
+    setCloseError('');
+    setCloseLoading(false);
+    setShowCloseDialog(true);
+  };
+
+  const handleCloseSprint = async () => {
+    if (!closingSprint) return;
+
+    if (closeAction === 'next_sprint' && !closeNextSprintId) {
+      setCloseError('Please select a sprint to move tasks to');
+      return;
+    }
+
+    setCloseLoading(true);
+    setCloseError('');
+
+    try {
+      const payload: { action: string; nextSprintId?: string } = { action: closeAction };
+      if (closeAction === 'next_sprint') {
+        payload.nextSprintId = closeNextSprintId;
+      }
+
+      await apiPut(`/sprints/${closingSprint.id}/close`, payload);
+
+      setShowCloseDialog(false);
+      setClosingSprint(null);
+      toast.success('Sprint closed successfully');
+      fetchAllData();
+      window.dispatchEvent(new Event('sprints-updated'));
+    } catch (err: any) {
+      setCloseError(err.message || 'Failed to close sprint');
+    } finally {
+      setCloseLoading(false);
+    }
   };
 
   const handleOpenTaskDrawer = (sprintId: string | null) => {
@@ -481,6 +524,17 @@ export default function GlobalSprintsPage() {
                           >
                             <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                           </button>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-success/10 text-success hover:bg-success/20 flex-shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenCloseDialog(sprint);
+                            }}
+                            aria-label={`Close ${sprint.name}`}
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            Close
+                          </button>
                         </div>
                         {/* Line 2: dates + count + progress */}
                         <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
@@ -543,15 +597,37 @@ export default function GlobalSprintsPage() {
                                     <span className="flex-1 truncate text-foreground" title={task.title}>
                                       {task.title}
                                     </span>
-                                    <span className={cn(getStatusPillClasses(task.status), 'flex-shrink-0')}>
+                                    {task.assignees && task.assignees.length > 0 && (
+                                      <div className="flex -space-x-1.5 shrink-0">
+                                        {task.assignees.slice(0, 3).map((assignee) => (
+                                          <div
+                                            key={assignee.id}
+                                            className={cn(
+                                              'h-6 w-6 rounded-full text-white text-[10px] font-medium flex items-center justify-center border-2 border-background ring-1 ring-border/50',
+                                              getAvatarColor(assignee.id || assignee.userId)
+                                            )}
+                                            title={assignee.user?.displayName}
+                                          >
+                                            {assignee.user?.displayName?.[0]?.toUpperCase() || '?'}
+                                          </div>
+                                        ))}
+                                        {task.assignees.length > 3 && (
+                                          <div className="h-6 w-6 rounded-full bg-muted text-muted-foreground text-[10px] font-medium flex items-center justify-center border-2 border-background">
+                                            +{task.assignees.length - 3}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                    <span className={cn(getStatusPillClasses(task.status), 'shrink-0')}>
                                       {formatStatusLabel(task.status)}
                                     </span>
-                                    {task.assignees && task.assignees.length > 0 && (
-                                      <span className="text-xs text-muted-foreground flex-shrink-0">
-                                        {task.assignees.length} {task.assignees.length === 1 ? 'assignee' : 'assignees'}
+                                    {task.dueDate && (
+                                      <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                        <Calendar className="h-3 w-3" />
+                                        {formatDate(task.dueDate)}
                                       </span>
                                     )}
-                                    <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                                     <Select
                                       value={undefined}
                                       onValueChange={(value) => {
@@ -563,7 +639,7 @@ export default function GlobalSprintsPage() {
                                         }
                                       }}
                                     >
-                                      <SelectTrigger className="h-7 w-36 text-xs flex-shrink-0">
+                                      <SelectTrigger className="h-7 w-36 text-xs shrink-0">
                                         <SelectValue placeholder="Move to..." />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -701,15 +777,37 @@ export default function GlobalSprintsPage() {
                                     <span className="flex-1 truncate text-foreground" title={task.title}>
                                       {task.title}
                                     </span>
-                                    <span className={cn(getStatusPillClasses(task.status), 'flex-shrink-0')}>
+                                    {task.assignees && task.assignees.length > 0 && (
+                                      <div className="flex -space-x-1.5 shrink-0">
+                                        {task.assignees.slice(0, 3).map((assignee) => (
+                                          <div
+                                            key={assignee.id}
+                                            className={cn(
+                                              'h-6 w-6 rounded-full text-white text-[10px] font-medium flex items-center justify-center border-2 border-background ring-1 ring-border/50',
+                                              getAvatarColor(assignee.id || assignee.userId)
+                                            )}
+                                            title={assignee.user?.displayName}
+                                          >
+                                            {assignee.user?.displayName?.[0]?.toUpperCase() || '?'}
+                                          </div>
+                                        ))}
+                                        {task.assignees.length > 3 && (
+                                          <div className="h-6 w-6 rounded-full bg-muted text-muted-foreground text-[10px] font-medium flex items-center justify-center border-2 border-background">
+                                            +{task.assignees.length - 3}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                    <span className={cn(getStatusPillClasses(task.status), 'shrink-0')}>
                                       {formatStatusLabel(task.status)}
                                     </span>
-                                    {task.assignees && task.assignees.length > 0 && (
-                                      <span className="text-xs text-muted-foreground flex-shrink-0">
-                                        {task.assignees.length} {task.assignees.length === 1 ? 'assignee' : 'assignees'}
+                                    {task.dueDate && (
+                                      <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                        <Calendar className="h-3 w-3" />
+                                        {formatDate(task.dueDate)}
                                       </span>
                                     )}
-                                    <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                                     <Select
                                       value={undefined}
                                       onValueChange={(value) => {
@@ -721,7 +819,7 @@ export default function GlobalSprintsPage() {
                                         }
                                       }}
                                     >
-                                      <SelectTrigger className="h-7 w-36 text-xs flex-shrink-0">
+                                      <SelectTrigger className="h-7 w-36 text-xs shrink-0">
                                         <SelectValue placeholder="Move to..." />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -1382,6 +1480,124 @@ export default function GlobalSprintsPage() {
         <DialogFooter>
           <Button variant="outline" onClick={() => { setShowEditDialog(false); setEditError(''); }}>Cancel</Button>
           <Button onClick={handleSaveEdit}>Update Sprint</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Close Sprint Dialog */}
+    <Dialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Close sprint</DialogTitle>
+          <DialogDescription>
+            {closingSprint && (() => {
+              const incompleteTasks = (closingSprint.tasks || []).filter((t) => t.status !== 'done');
+              if (incompleteTasks.length === 0) {
+                return `All tasks are complete. Close this sprint?`;
+              }
+              return `${closingSprint.name} has ${incompleteTasks.length} incomplete task${incompleteTasks.length === 1 ? '' : 's'}. Choose where to move them.`;
+            })()}
+          </DialogDescription>
+        </DialogHeader>
+
+        {closingSprint && (() => {
+          const allTasks = closingSprint.tasks || [];
+          const incompleteTasks = allTasks.filter((t) => t.status !== 'done');
+          const completedCount = allTasks.filter((t) => t.status === 'done').length;
+          const otherActive = activeSprints.filter((s) => s.id !== closingSprint.id);
+          const selectedSprintName = otherActive.find((s) => s.id === closeNextSprintId)?.name;
+
+          if (incompleteTasks.length === 0) {
+            return (
+              <p className="text-sm text-muted-foreground">
+                All {allTasks.length} task{allTasks.length === 1 ? '' : 's'} in this sprint are marked as done.
+              </p>
+            );
+          }
+
+          return (
+            <div className="space-y-4">
+              {/* Incomplete task list */}
+              <div className="border rounded-md max-h-48 overflow-y-auto">
+                {incompleteTasks.map((task, idx) => (
+                  <div
+                    key={task.id}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2 text-sm',
+                      idx < incompleteTasks.length - 1 && 'border-b'
+                    )}
+                  >
+                    <span className={cn('w-2 h-2 rounded-full flex-shrink-0', getPriorityDotColor(task.priority))} />
+                    <span className="flex-1 truncate text-foreground">{task.title}</span>
+                    <span className={cn(getStatusPillClasses(task.status), 'flex-shrink-0')}>
+                      {formatStatusLabel(task.status)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Radio group */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Move incomplete tasks to:</Label>
+                <RadioGroup value={closeAction} onValueChange={(v) => setCloseAction(v as 'backlog' | 'next_sprint')}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="backlog" id="close-backlog" />
+                    <Label htmlFor="close-backlog" className="cursor-pointer">
+                      <span className="text-sm font-medium">Backlog</span>
+                      <span className="text-xs text-muted-foreground ml-2">Remove sprint assignment</span>
+                    </Label>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem
+                        value="next_sprint"
+                        id="close-next-sprint"
+                        disabled={otherActive.length === 0}
+                      />
+                      <Label htmlFor="close-next-sprint" className={cn("cursor-pointer", otherActive.length === 0 && "opacity-50")}>
+                        <span className="text-sm font-medium">Move to sprint</span>
+                        {otherActive.length === 0 && (
+                          <span className="text-xs text-muted-foreground ml-2">No other active sprints</span>
+                        )}
+                      </Label>
+                    </div>
+                    {closeAction === 'next_sprint' && otherActive.length > 0 && (
+                      <div className="ml-6">
+                        <Select value={closeNextSprintId || undefined} onValueChange={setCloseNextSprintId}>
+                          <SelectTrigger className="h-8 w-full text-xs">
+                            <SelectValue placeholder="Select a sprint..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {otherActive.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* Summary */}
+              <div className="bg-muted rounded-md p-3">
+                <p className="text-sm text-muted-foreground">
+                  {completedCount} completed task{completedCount === 1 ? '' : 's'} will stay in this sprint's history. {incompleteTasks.length} incomplete task{incompleteTasks.length === 1 ? '' : 's'} will be moved to {closeAction === 'backlog' ? 'backlog' : (selectedSprintName || 'the selected sprint')}.
+                </p>
+              </div>
+            </div>
+          );
+        })()}
+
+        {closeError && <p className="text-sm text-destructive">{closeError}</p>}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { setShowCloseDialog(false); setClosingSprint(null); }}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={handleCloseSprint} disabled={closeLoading}>
+            {closeLoading ? 'Closing...' : 'Close sprint'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

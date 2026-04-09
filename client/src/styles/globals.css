@@ -162,7 +162,7 @@
   --ring: oklch(0.76 0.13 192);
 
   /* Field container tokens — cool gray for form fields */
-  --field-bg: oklch(0.95 0.008 250);
+  --field-bg: oklch(0.97 0.005 250);
   --field-border: oklch(0.85 0.012 250);
 
   /* Component surface tokens */
