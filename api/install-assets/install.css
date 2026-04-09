@@ -1,0 +1,406 @@
+/* JamWork Installer — Light mode only */
+
+:root {
+  --primary: #1a1f3d;
+  --primary-fg: #f8f8fa;
+  --teal: #4eb8a8;
+  --teal-light: #e6f5f2;
+  --success: #3ba876;
+  --success-light: #e8f5ee;
+  --destructive: #d64545;
+  --destructive-light: #fceaea;
+  --warning: #d4a834;
+  --warning-light: #fdf5e1;
+  --bg: #ffffff;
+  --card: #fdfdfb;
+  --fg: #1a1f3d;
+  --fg-muted: #72727a;
+  --border: #e2e2e6;
+  --muted-bg: #f4f4f6;
+  --radius: 8px;
+  --radius-sm: 6px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--muted-bg);
+  min-height: 100vh;
+  padding: 32px 16px;
+}
+
+.installer-container {
+  max-width: 540px;
+  margin: 0 auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(26, 31, 61, 0.06), 0 4px 12px rgba(26, 31, 61, 0.04);
+  padding: 32px;
+}
+
+/* ── Typography ────────────────────────────────── */
+
+h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 4px; }
+h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 8px; outline: none; }
+h3 { font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
+p { margin-bottom: 12px; }
+.text-muted { color: var(--fg-muted); font-size: 0.875rem; }
+.text-sm { font-size: 0.875rem; }
+.subtitle { color: var(--fg-muted); font-size: 1.05rem; margin-bottom: 20px; }
+
+/* ── Progress indicator ────────────────────────── */
+
+.step-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+  color: var(--fg-muted);
+  background: var(--bg);
+}
+
+.step-item.completed .step-circle {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: white;
+}
+
+.step-item.active .step-circle {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-fg);
+}
+
+.step-connector {
+  width: 24px;
+  height: 2px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.step-item.completed + .step-connector,
+.step-connector.completed {
+  background: var(--teal);
+}
+
+.step-label {
+  display: none;
+}
+
+/* ── Forms ─────────────────────────────────────── */
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="url"],
+input[type="number"] {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px var(--teal-light);
+}
+
+input.error {
+  border-color: var(--destructive);
+}
+
+input.error:focus {
+  box-shadow: 0 0 0 3px var(--destructive-light);
+}
+
+.help-text {
+  font-size: 0.8125rem;
+  color: var(--fg-muted);
+  margin-top: 4px;
+}
+
+.field-error {
+  font-size: 0.8125rem;
+  color: var(--destructive);
+  margin-top: 4px;
+}
+
+.password-wrapper {
+  position: relative;
+}
+
+.password-wrapper input {
+  padding-right: 60px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 0.8125rem;
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.password-toggle:hover {
+  color: var(--fg);
+}
+
+/* ── Buttons ───────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 20px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s, opacity 0.15s;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-fg);
+}
+
+.btn-primary:hover { opacity: 0.9; }
+
+.btn-primary:disabled,
+.btn-primary.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-teal {
+  background: var(--teal);
+  color: white;
+}
+
+.btn-teal:hover { opacity: 0.9; }
+
+.btn-ghost {
+  background: none;
+  color: var(--fg-muted);
+  padding: 10px 12px;
+}
+
+.btn-ghost:hover { color: var(--fg); }
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--teal);
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.btn-link:hover { opacity: 0.8; }
+
+.btn-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+}
+
+/* ── Alerts ────────────────────────────────────── */
+
+.alert {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  margin-bottom: 16px;
+}
+
+.alert-error {
+  background: var(--destructive-light);
+  color: var(--destructive);
+  border: 1px solid var(--destructive);
+}
+
+.alert-success {
+  background: var(--success-light);
+  color: #1a6b43;
+  border: 1px solid var(--success);
+}
+
+.alert-warning {
+  background: var(--warning-light);
+  color: #7a5e10;
+  border: 1px solid var(--warning);
+}
+
+.alert-info {
+  background: var(--teal-light);
+  color: #1a5c50;
+  border: 1px solid var(--teal);
+}
+
+/* ── Environment checks ───────────────────────── */
+
+.check-list {
+  list-style: none;
+  margin: 16px 0;
+}
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9375rem;
+}
+
+.check-item:last-child { border-bottom: none; }
+
+.check-icon {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  font-size: 1rem;
+}
+
+.check-pass { color: var(--success); }
+.check-fail { color: var(--destructive); }
+
+.check-detail {
+  flex: 1;
+}
+
+.check-detail .fail-msg {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--destructive);
+  margin-top: 2px;
+}
+
+/* ── Review summary ────────────────────────────── */
+
+.review-section {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.review-section:last-child { border-bottom: none; }
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 4px 12px;
+  font-size: 0.875rem;
+}
+
+.review-label {
+  color: var(--fg-muted);
+}
+
+/* ── Prerequisites box ─────────────────────────── */
+
+.prereq-box {
+  background: var(--muted-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+  margin: 16px 0;
+}
+
+.prereq-box h3 { margin-bottom: 8px; }
+
+.prereq-box ul {
+  list-style: disc;
+  padding-left: 20px;
+  font-size: 0.875rem;
+  color: var(--fg-muted);
+}
+
+.prereq-box li { margin-bottom: 4px; }
+
+/* ── Utilities ─────────────────────────────────── */
+
+.mb-0 { margin-bottom: 0; }
+.mb-4 { margin-bottom: 4px; }
+.mb-8 { margin-bottom: 8px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+.text-center { text-align: center; }
+
+/* ── Responsive ────────────────────────────────── */
+
+@media (max-width: 600px) {
+  body { padding: 16px 8px; }
+  .installer-container { padding: 20px 16px; }
+  h1 { font-size: 1.5rem; }
+  .review-grid { grid-template-columns: 1fr; }
+  .btn-row { flex-direction: column-reverse; gap: 8px; }
+  .btn-row .btn { width: 100%; }
+}

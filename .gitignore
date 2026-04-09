@@ -1,14 +1,18 @@
+# NOTE: api/vendor/ and client/dist/ are intentionally tracked.
+# They ship as part of the distribution so deployers don't need
+# CLI tools (composer, node). Developers: run `composer install`
+# and `npm run build` as usual — your local copies will match.
+
 # Dependencies
 node_modules/
 client/node_modules/
-api/vendor/
-
-# Build output
-client/dist/
 
 # Environment files
 .env
 api/.env
+
+# Installer lock file
+api/.installed
 
 # IDE
 .vscode/
@@ -22,8 +26,8 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# PHP
-api/vendor/
-
 # Docker
 docker-compose.override.yml
+
+# Local dev docs
+DEV-SETUP.md

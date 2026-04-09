@@ -18,6 +18,11 @@
     Require all denied
 </FilesMatch>
 
+# Block .installed lock file
+<FilesMatch "^\.installed$">
+    Require all denied
+</FilesMatch>
+
 # ── Deny access to sensitive directories ─────────────────
 RewriteEngine On
 
@@ -25,6 +30,10 @@ RewriteEngine On
 RewriteRule ^src/ - [F,L]
 RewriteRule ^migrations/ - [F,L]
 RewriteRule ^vendor/ - [F,L]
+
+# ── Installer passthrough ────────────────────────────────
+RewriteRule ^install\.php$ - [L]
+RewriteRule ^install-assets/ - [L]
 
 # ── Slim 4 front controller ─────────────────────────────
 RewriteCond %{REQUEST_FILENAME} !-f

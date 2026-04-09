@@ -3,6 +3,13 @@
 
 RewriteEngine On
 
+# ── Install gate ─────────────────────────────────────────
+# If not installed, route all requests to the installer
+RewriteCond %{DOCUMENT_ROOT}/api/.installed !-f
+RewriteCond %{REQUEST_URI} !^/api/install\.php [NC]
+RewriteCond %{REQUEST_URI} !^/api/install-assets/ [NC]
+RewriteRule ^ /api/install.php [L]
+
 # ── API passthrough ───────────────────────────────────────
 # Let /api/ requests fall through to api/.htaccess
 RewriteRule ^api/ - [L]
