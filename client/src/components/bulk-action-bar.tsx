@@ -113,6 +113,7 @@ export function BulkActionBar({
     try {
       await apiPost('/tasks/bulk-delete', { taskIds });
       toast.success(`Deleted ${taskIds.length} task(s)`);
+      window.dispatchEvent(new Event('projects-updated'));
       onActionComplete();
     } catch (err: any) {
       console.error('Failed to delete tasks:', err);

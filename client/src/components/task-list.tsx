@@ -501,6 +501,7 @@ export function TaskList({
 
       // Replace optimistic task with real task
       setTasks((prev) => prev.map((t) => (t.id === tempId ? result.task : t)));
+      window.dispatchEvent(new Event('projects-updated'));
     } catch (err) {
       console.error("Failed to create task:", err);
       // Remove optimistic task on error

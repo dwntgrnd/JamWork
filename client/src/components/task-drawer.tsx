@@ -407,6 +407,7 @@ export function TaskDrawer({
       }
 
       setSaved(true);
+      window.dispatchEvent(new Event('projects-updated'));
       setTimeout(() => {
         onSave();
       }, 1000);
@@ -421,6 +422,7 @@ export function TaskDrawer({
 
     try {
       await apiDelete(`/tasks/${task.id}`);
+      window.dispatchEvent(new Event('projects-updated'));
       onSave();
     } catch (err: any) {
       setError(err.message || 'Failed to delete task');
