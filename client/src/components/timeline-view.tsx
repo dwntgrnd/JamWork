@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label as FormLabel } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, Target, GanttChart, Diamond, Plus, Edit2, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Target, GanttChart, Diamond, Plus, Edit2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { isOverdue } from '@/lib/date-utils';
@@ -78,6 +78,21 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
   const [milestoneForm, setMilestoneForm] = useState({ name: '', date: '' });
   const [milestoneError, setMilestoneError] = useState('');
 
+  // Collapsed project groups (global mode only). Ephemeral — not persisted.
+  const [collapsedProjectIds, setCollapsedProjectIds] = useState<Set<string>>(new Set());
+
+  const toggleProjectCollapsed = (projId: string) => {
+    setCollapsedProjectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(projId)) {
+        next.delete(projId);
+      } else {
+        next.add(projId);
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     fetchData();
   }, [projectId]);
@@ -90,10 +105,13 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
       const projectQuery = projectId ? `?projectId=${projectId}` : '';
 
       // Fetch all data in parallel
+      // Note: sprints and milestones are global — they represent shared resource
+      // cycles and organizational roadmap markers, and every project sees the same
+      // set. Only tasks are project-scoped.
       const [tasksData, milestonesData, sprintsData, currentUserData, projectsData] = await Promise.all([
         apiGet<{ tasks: Task[] }>(`/tasks${projectQuery}`),
-        apiGet<{ milestones: Milestone[] }>(`/milestones${projectQuery}`),
-        apiGet<{ sprints: Sprint[] }>(`/sprints${projectQuery}`),
+        apiGet<{ milestones: Milestone[] }>('/milestones'),
+        apiGet<{ sprints: Sprint[] }>('/sprints'),
         apiGet<{ user: UserSummary }>('/auth/me'),
         apiGet<{ projects: Project[] }>('/projects'),
       ]);
@@ -250,6 +268,26 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
     noProjectTasks.forEach((task) => rows.push({ type: 'task', task }));
 
     return rows;
+  })();
+
+  // Apply collapse state: hide task rows whose parent project is collapsed.
+  // Orphan tasks (no projectId) are always visible — they render after the last
+  // project group and must not inherit the preceding project's collapsed state.
+  const visibleRows: TimelineRow[] = (() => {
+    if (!isGlobal) return timelineRows;
+    const out: TimelineRow[] = [];
+    let currentProjectCollapsed = false;
+    for (const row of timelineRows) {
+      if (row.type === 'project') {
+        out.push(row);
+        currentProjectCollapsed = collapsedProjectIds.has(row.project.id);
+      } else {
+        if (!row.task.projectId || !currentProjectCollapsed) {
+          out.push(row);
+        }
+      }
+    }
+    return out;
   })();
 
   // Calculate date range
@@ -582,17 +620,50 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
               )}
 
               {/* Task rows (grouped by project in global mode) */}
-              {timelineRows.map((row) =>
-                row.type === 'project' ? (
-                  <div key={`proj-${row.project.id}`} className="h-5 border-b px-3 flex items-center bg-muted/80">
-                    <div className="text-xs font-semibold text-muted-foreground truncate">
-                      {row.project.name}
+              {visibleRows.map((row, rowIdx) => {
+                if (row.type === 'project') {
+                  const isCollapsed = collapsedProjectIds.has(row.project.id);
+                  const projectTaskCount = filteredTasks.filter(
+                    (t) => t.projectId === row.project.id
+                  ).length;
+                  return (
+                    <div
+                      key={`proj-${row.project.id}`}
+                      className="h-5 border-b border-t border-t-muted-foreground/60 px-3 flex items-center bg-muted-foreground/8 gap-1.5"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleProjectCollapsed(row.project.id)}
+                        aria-expanded={!isCollapsed}
+                        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${row.project.name}`}
+                        className="flex items-center justify-center rounded-sm hover:bg-muted-foreground/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {isCollapsed ? (
+                          <ChevronRight className="h-3 w-3 text-foreground" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3 text-foreground" />
+                        )}
+                      </button>
+                      <div className="text-xs font-bold text-foreground truncate flex-1">
+                        {row.project.name}
+                      </div>
+                      {isCollapsed && projectTaskCount > 0 && (
+                        <span className="text-[10px] font-medium text-muted-foreground flex-shrink-0">
+                          {projectTaskCount} {projectTaskCount === 1 ? 'task' : 'tasks'}
+                        </span>
+                      )}
                     </div>
-                  </div>
-                ) : (
+                  );
+                }
+                const nextIsProject = visibleRows[rowIdx + 1]?.type === 'project';
+                return (
                   <div
                     key={row.task.id}
-                    className={cn('h-9 border-b px-3', isGlobal && 'pl-4')}
+                    className={cn(
+                      'h-9 px-3',
+                      !nextIsProject && 'border-b',
+                      isGlobal && 'pl-4'
+                    )}
                   >
                     <div className="flex items-center gap-1.5 min-w-0 h-full">
                       {getPriorityDotColor(row.task.priority) && (
@@ -620,8 +691,8 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
                       )}
                     </div>
                   </div>
-                )
-              )}
+                );
+              })}
             </div>
 
             {/* Scrollable timeline area */}
@@ -728,12 +799,39 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
                 )}
 
                 {/* Task rows (grouped by project in global mode) */}
-                {timelineRows.map((row, rowIdx) => {
+                {visibleRows.map((row, rowIdx) => {
                   if (row.type === 'project') {
                     const proj = row.project;
                     const hasDateRange = proj.startDate && proj.endDate;
+                    const isCollapsed = collapsedProjectIds.has(proj.id);
+
+                    // Compute earliest/latest task dates for collapsed summary bar.
+                    let earliestDate: Date | null = null;
+                    let latestDate: Date | null = null;
+                    if (isCollapsed) {
+                      const projectTasks = filteredTasks.filter(
+                        (t) => t.projectId === proj.id
+                      );
+                      const taskDates: Date[] = [];
+                      projectTasks.forEach((t) => {
+                        if (t.startDate) taskDates.push(new Date(t.startDate));
+                        if (t.dueDate) taskDates.push(new Date(t.dueDate));
+                      });
+                      if (taskDates.length > 0) {
+                        earliestDate = new Date(
+                          Math.min(...taskDates.map((d) => d.getTime()))
+                        );
+                        latestDate = new Date(
+                          Math.max(...taskDates.map((d) => d.getTime()))
+                        );
+                      }
+                    }
+
                     return (
-                      <div key={`proj-${proj.id}`} className="h-5 border-b relative bg-muted/30">
+                      <div
+                        key={`proj-${proj.id}`}
+                        className="h-5 border-b border-t border-t-muted-foreground/60 relative bg-muted-foreground/8"
+                      >
                         {/* Grid lines */}
                         {timeColumns.map((_, idx) => (
                           <div
@@ -767,16 +865,32 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
                             </TooltipContent>
                           </Tooltip>
                         )}
+                        {/* Collapsed summary bar — spans earliest task start to latest task end */}
+                        {isCollapsed && earliestDate && latestDate && (
+                          <div
+                            className="absolute top-1/2 -translate-y-1/2 h-2 rounded-sm bg-foreground/20 z-[2]"
+                            style={{
+                              left: getDatePosition(earliestDate),
+                              width: Math.max(
+                                getDatePosition(latestDate) - getDatePosition(earliestDate),
+                                4
+                              ),
+                            }}
+                            aria-hidden="true"
+                          />
+                        )}
                       </div>
                     );
                   }
 
                   const task = row.task;
+                  const nextIsProject = visibleRows[rowIdx + 1]?.type === 'project';
                   return (
                     <div
                       key={task.id}
                       className={cn(
-                        'h-9 border-b relative',
+                        'h-9 relative',
+                        !nextIsProject && 'border-b',
                         rowIdx % 2 === 0 ? 'bg-card/70' : 'bg-muted/50'
                       )}
                     >
