@@ -32,6 +32,11 @@ docker-compose.override.yml
 # Local dev docs
 DEV-SETUP.md
 
+# Operational / local-only — specific to this instance's deployments, not part
+# of the release package others consume.
+docs/production-update-runbook.md
+docs/cc-prompts/
+
 # Production env (real credentials — never commit)
 api/.env.production
 
