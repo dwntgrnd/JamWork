@@ -201,6 +201,8 @@ export function TaskDrawer({
     if (mode === 'edit') {
       try {
         await saveField('status', newStatus);
+        // Status changes alter a project's open-task count — refresh the sidebar badge.
+        window.dispatchEvent(new Event('projects-updated'));
       } catch {
         setStatus(prev); // revert on failure
       }

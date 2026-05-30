@@ -67,6 +67,18 @@ runbook** top to bottom.
 - **Frontend (code-only):** `project-header.tsx` — header label changed from "X tasks" to
   "X open" so the meaning is explicit. Sidebar badge unchanged (just shows the number,
   which now means open tasks).
+- **Dynamic refresh (code-only):** the count updates live (no page reload) on the existing
+  `projects-updated` window event.
+  - *Dispatch side:* status-change paths that didn't already fire it now do —
+    `task-list.tsx` (inline status edit), `task-drawer.tsx` (`handleStatusChange`),
+    `board-view.tsx` (`handleDragEnd`), `bulk-action-bar.tsx` (mark-as-done + its undo).
+    Create/delete already dispatched.
+  - *Listen side:* the sidebar already listened. The **project-page header** did not — its
+    `project` state was fetched per-page and never refreshed on the event. Fixed by a new
+    shared `useProject(projectId)` hook (`hooks/use-project.ts`) that fetches the project
+    *and* listens for `projects-updated`; `project.tsx`, `project-board.tsx`, and
+    `project-timeline.tsx` now use it, which also removed three copies of identical
+    fetch logic.
 - **Status:** ✅ implemented in dev, verified (DB count check: a project with 7 total / 2
   done now reports 5).
 
@@ -86,6 +98,14 @@ opportunistic refactors for next time the area is touched.
   "Blocked" — two selectors were initially missed. Cleanup: render options by mapping over
   `STATUS_LABELS`, and derive a single backend allow-list constant referenced by all three
   validation sites. Would turn "add a status" into a ~2-line change.
+
+- **Centralize the `projects-updated` signal.** The sidebar refreshes its open-task badge
+  by listening for a `projects-updated` window event that each task-mutation site
+  dispatches by hand (`task-list`, `task-drawer`, `board-view`, `bulk-action-bar`). Same
+  class of scattered-wiring risk as the status lists — a new mutation path can forget to
+  fire it (the bulk mark-as-done path originally did). Cleanup: dispatch it once from the
+  `/tasks` mutation helpers in `lib/api.ts` (or a thin wrapper), so every task write
+  refreshes counts automatically.
 
 ---
 

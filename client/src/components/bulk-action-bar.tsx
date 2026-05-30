@@ -77,6 +77,8 @@ export function BulkActionBar({
         taskIds,
         fields: { status: 'done' },
       });
+      // Status changes alter projects' open-task counts — refresh the sidebar badges.
+      window.dispatchEvent(new Event('projects-updated'));
 
       toast.success(`Marked ${taskIds.length} task(s) as done`, {
         action: {
@@ -87,6 +89,7 @@ export function BulkActionBar({
               for (const [id, status] of previousStatuses.entries()) {
                 await apiPut(`/tasks/${id}`, { status });
               }
+              window.dispatchEvent(new Event('projects-updated'));
               onActionComplete();
               toast.success('Undo complete');
             } catch (err) {

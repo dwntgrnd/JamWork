@@ -355,6 +355,11 @@ export function TaskList({
         { [field]: value },
       );
 
+      // Status changes alter a project's open-task count — refresh the sidebar badge.
+      if (field === "status") {
+        window.dispatchEvent(new Event('projects-updated'));
+      }
+
       // If a recurring task was marked done and cloned, refresh to show the new task
       if (result.clonedTask) {
         await fetchTasks({ silent: true });

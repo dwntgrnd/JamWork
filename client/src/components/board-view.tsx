@@ -140,6 +140,8 @@ export function BoardView({ projectId, filters, refreshKey }: BoardViewProps) {
         if (result.clonedTask) {
           needsRefresh = true;
         }
+        // Status changes alter a project's open-task count — refresh the sidebar badge.
+        window.dispatchEvent(new Event('projects-updated'));
       }
 
       // Update sortOrder via reorder endpoint
