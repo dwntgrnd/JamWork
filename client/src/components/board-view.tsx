@@ -13,9 +13,10 @@ import { toast } from 'sonner';
 interface BoardViewProps {
   projectId: string;
   filters: TaskFilterState;
+  refreshKey?: number;
 }
 
-export function BoardView({ projectId, filters }: BoardViewProps) {
+export function BoardView({ projectId, filters, refreshKey }: BoardViewProps) {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -30,7 +31,7 @@ export function BoardView({ projectId, filters }: BoardViewProps) {
 
   useEffect(() => {
     fetchTasks();
-  }, [projectId]);
+  }, [projectId, refreshKey]);
 
   const fetchTasks = async () => {
     try {
@@ -43,10 +44,6 @@ export function BoardView({ projectId, filters }: BoardViewProps) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleRefresh = () => {
-    fetchTasks();
   };
 
   // Filter tasks using filters prop
@@ -76,6 +73,7 @@ export function BoardView({ projectId, filters }: BoardViewProps) {
   const columns: { status: TaskStatus; title: string }[] = [
     { status: 'todo', title: 'To Do' },
     { status: 'in_progress', title: 'In Progress' },
+    { status: 'blocked', title: 'Blocked' },
     { status: 'review', title: 'Review' },
     { status: 'done', title: 'Done' },
   ];

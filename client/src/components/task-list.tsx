@@ -936,6 +936,9 @@ export function TaskList({
                                     <SelectItem value="in_progress">
                                       {STATUS_LABELS.in_progress}
                                     </SelectItem>
+                                    <SelectItem value="blocked">
+                                      {STATUS_LABELS.blocked}
+                                    </SelectItem>
                                     <SelectItem value="review">
                                       {STATUS_LABELS.review}
                                     </SelectItem>

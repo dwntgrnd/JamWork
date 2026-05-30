@@ -860,6 +860,7 @@ ENV;
         $migrations = [
             __DIR__ . '/migrations/001_initial_schema.sql',
             __DIR__ . '/migrations/002_password_reset_tokens.sql',
+            __DIR__ . '/migrations/003_project_sprint_planning.sql',
         ];
 
         foreach ($migrations as $file) {

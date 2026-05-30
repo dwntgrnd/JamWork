@@ -43,6 +43,7 @@ type ZoomLevel = 'day' | 'week' | 'month';
 interface TimelineViewProps {
   projectId?: string;
   filters?: TaskFilterState;
+  refreshKey?: number;
 }
 
 const SPRINT_COLORS = [
@@ -59,7 +60,7 @@ const formatShortDate = (date: Date | string): string => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
+const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewProps) => {
   const isMobile = useIsMobile();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -100,7 +101,7 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
 
   useEffect(() => {
     fetchData();
-  }, [projectId]);
+  }, [projectId, refreshKey]);
 
   const fetchData = async () => {
     try {
@@ -238,6 +239,11 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
     | { type: 'task'; task: Task };
 
   const isGlobal = !projectId;
+
+  // Sprint bands stay on the global view (sprints are shared cycles), but a single
+  // project's timeline hides them when that project has opted out of sprint planning.
+  const currentProject = projectId ? projects.find((p) => p.id === projectId) : undefined;
+  const showSprintBands = isGlobal || currentProject?.sprintPlanning !== false;
 
   const timelineRows: TimelineRow[] = (() => {
     if (!isGlobal) {
@@ -445,6 +451,8 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
         return 'bg-status-todo-bg';
       case 'in_progress':
         return 'bg-status-in_progress-bg';
+      case 'blocked':
+        return 'bg-status-blocked-bg';
       case 'review':
         return 'bg-status-review-bg';
       case 'done':
@@ -804,7 +812,7 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
                 )}
 
                 {/* Sprint overlays */}
-                {sprints.map((sprint, idx) => {
+                {showSprintBands && sprints.map((sprint, idx) => {
                   const startPos = getDatePosition(sprint.startDate);
                   const endPos = getDatePosition(sprint.endDate);
                   const width = endPos - startPos;
@@ -990,6 +998,7 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
                                 'absolute top-[6px] h-6 rounded-md cursor-pointer hover:shadow-md transition-shadow z-10',
                                 getStatusColor(task.status),
                                 isOverdue(task.dueDate, task.status) && 'ring-2 ring-destructive/50',
+                                task.status === 'blocked' && !isOverdue(task.dueDate, task.status) && 'ring-2 ring-status-blocked-fg/60',
                                 task.status === 'done' && 'opacity-60'
                               )}
                               style={{
@@ -1056,6 +1065,7 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
                                   'w-3 h-3 rounded-full border-2 border-white shadow-md',
                                   getStatusColor(task.status),
                                   isOverdue(task.dueDate, task.status) && 'ring-2 ring-destructive/50',
+                                  task.status === 'blocked' && !isOverdue(task.dueDate, task.status) && 'ring-2 ring-status-blocked-fg/60',
                                   task.status === 'done' && 'opacity-60'
                                 )}
                               />
@@ -1102,6 +1112,7 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
                                 className={cn(
                                   'w-3 h-3 rounded-full border-2 border-white shadow-md',
                                   getStatusColor(task.status),
+                                  task.status === 'blocked' && 'ring-2 ring-status-blocked-fg/60',
                                   task.status === 'done' && 'opacity-60'
                                 )}
                               />

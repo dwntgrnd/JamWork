@@ -1,6 +1,6 @@
 // Core entity types matching Prisma schema
 
-export type TaskStatus = "todo" | "in_progress" | "review" | "done";
+export type TaskStatus = "todo" | "in_progress" | "blocked" | "review" | "done";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type UserRole = "user" | "admin";
 export type RecurrenceType = "daily" | "weekly" | "biweekly" | "monthly";
@@ -11,6 +11,7 @@ export type SprintStatus = "active" | "completed";
 export const STATUS_LABELS: Record<TaskStatus, string> = {
   todo: "To Do",
   in_progress: "In Progress",
+  blocked: "Blocked",
   review: "Review",
   done: "Done",
 };
@@ -49,6 +50,7 @@ export interface Project {
   description?: string;
   startDate?: Date | string;
   endDate?: Date | string;
+  sprintPlanning?: boolean;
   createdById: string;
   createdAt: Date | string;
   updatedAt: Date | string;

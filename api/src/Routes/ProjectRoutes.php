@@ -18,7 +18,7 @@ class ProjectRoutes
     private const FETCH_QUERY = '
         SELECT p.*,
                u.id AS creator_id, u.email AS creator_email, u.display_name AS creator_display_name,
-               (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.deleted_at IS NULL) AS task_count
+               (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.deleted_at IS NULL AND t.status != \'done\') AS task_count
         FROM projects p
         JOIN users u ON p.created_by_id = u.id
     ';
@@ -31,6 +31,7 @@ class ProjectRoutes
             'description' => $row['description'],
             'startDate' => $row['start_date'] ? date('c', strtotime($row['start_date'])) : null,
             'endDate' => $row['end_date'] ? date('c', strtotime($row['end_date'])) : null,
+            'sprintPlanning' => (bool) $row['sprint_planning'],
             'createdAt' => date('c', strtotime($row['created_at'])),
             'updatedAt' => date('c', strtotime($row['updated_at'])),
             'createdById' => $row['created_by_id'],
@@ -73,6 +74,7 @@ class ProjectRoutes
                     'description' => 'optional|max:5000',
                     'startDate' => 'optional|iso8601',
                     'endDate' => 'optional|iso8601',
+                    'sprintPlanning' => 'optional|boolean',
                 ]);
 
                 if (!empty($errors)) {
@@ -97,8 +99,8 @@ class ProjectRoutes
                 $id = Uuid::uuid4()->toString();
 
                 $stmt = $db->prepare(
-                    'INSERT INTO projects (id, name, description, start_date, end_date, created_by_id)
-                     VALUES (:id, :name, :description, :start_date, :end_date, :created_by_id)'
+                    'INSERT INTO projects (id, name, description, start_date, end_date, sprint_planning, created_by_id)
+                     VALUES (:id, :name, :description, :start_date, :end_date, :sprint_planning, :created_by_id)'
                 );
                 $stmt->execute([
                     'id' => $id,
@@ -106,6 +108,7 @@ class ProjectRoutes
                     'description' => $data['description'] ?? null,
                     'start_date' => Validator::toMySQLDate($data['startDate'] ?? null),
                     'end_date' => Validator::toMySQLDate($data['endDate'] ?? null),
+                    'sprint_planning' => (int) ($data['sprintPlanning'] ?? true),
                     'created_by_id' => $userId,
                 ]);
 
@@ -139,6 +142,7 @@ class ProjectRoutes
                     'description' => 'optional',
                     'startDate' => 'optional|nullable|iso8601',
                     'endDate' => 'optional|nullable|iso8601',
+                    'sprintPlanning' => 'optional|boolean',
                 ]);
 
                 if (!empty($errors)) {
@@ -190,6 +194,11 @@ class ProjectRoutes
                 if (array_key_exists('endDate', $data)) {
                     $updates[] = 'end_date = :end_date';
                     $params['end_date'] = Validator::toMySQLDate($data['endDate']);
+                }
+
+                if (array_key_exists('sprintPlanning', $data)) {
+                    $updates[] = 'sprint_planning = :sprint_planning';
+                    $params['sprint_planning'] = (int) (bool) $data['sprintPlanning'];
                 }
 
                 if (!empty($updates)) {

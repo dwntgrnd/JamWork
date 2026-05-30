@@ -93,6 +93,8 @@
   --color-status-todo-fg: var(--status-todo-fg);
   --color-status-in_progress-bg: var(--status-in_progress-bg);
   --color-status-in_progress-fg: var(--status-in_progress-fg);
+  --color-status-blocked-bg: var(--status-blocked-bg);
+  --color-status-blocked-fg: var(--status-blocked-fg);
   --color-status-review-bg: var(--status-review-bg);
   --color-status-review-fg: var(--status-review-fg);
   --color-status-done-bg: var(--status-done-bg);
@@ -221,6 +223,8 @@
   --status-todo-fg: oklch(0.45 0.03 265);
   --status-in_progress-bg: oklch(0.93 0.04 192);
   --status-in_progress-fg: oklch(0.42 0.12 192);
+  --status-blocked-bg: oklch(0.93 0.06 55);
+  --status-blocked-fg: oklch(0.48 0.14 55);
   --status-review-bg: oklch(0.94 0.05 80);
   --status-review-fg: oklch(0.45 0.10 80);
   --status-done-bg: oklch(0.92 0.06 145);
@@ -370,6 +374,8 @@
   --status-todo-fg: oklch(0.70 0.02 265);
   --status-in_progress-bg: oklch(0.22 0.04 192);
   --status-in_progress-fg: oklch(0.75 0.12 192);
+  --status-blocked-bg: oklch(0.23 0.05 55);
+  --status-blocked-fg: oklch(0.78 0.13 55);
   --status-review-bg: oklch(0.24 0.04 80);
   --status-review-fg: oklch(0.78 0.12 80);
   --status-done-bg: oklch(0.22 0.05 145);

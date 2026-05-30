@@ -22,6 +22,10 @@ export const STATUS_COLORS: Record<
     bg: 'bg-status-in_progress-bg',
     text: 'text-status-in_progress-fg',
   },
+  blocked: {
+    bg: 'bg-status-blocked-bg',
+    text: 'text-status-blocked-fg',
+  },
   review: {
     bg: 'bg-status-review-bg',
     text: 'text-status-review-fg',

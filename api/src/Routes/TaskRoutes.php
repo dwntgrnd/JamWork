@@ -92,8 +92,8 @@ class TaskRoutes
                 }
 
                 $fields = $data['fields'];
-                if (isset($fields['status']) && !in_array($fields['status'], ['todo', 'in_progress', 'review', 'done'], true)) {
-                    $response->getBody()->write(json_encode(['error' => 'status must be one of: todo, in_progress, review, done']));
+                if (isset($fields['status']) && !in_array($fields['status'], ['todo', 'in_progress', 'blocked', 'review', 'done'], true)) {
+                    $response->getBody()->write(json_encode(['error' => 'status must be one of: todo, in_progress, blocked, review, done']));
                     return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
                 }
                 if (isset($fields['priority']) && !in_array($fields['priority'], ['low', 'medium', 'high', 'urgent'], true)) {
@@ -207,9 +207,12 @@ class TaskRoutes
                 }
 
                 // Filter: sprintId (supports 'null' string for unassigned)
+                // The unassigned set IS the sprint backlog, so exclude tasks whose project
+                // opted out of sprint planning (p.sprint_planning = 0) — they should not clutter it.
                 if (array_key_exists('sprintId', $params)) {
                     if ($params['sprintId'] === 'null') {
                         $conditions[] = 't.sprint_id IS NULL';
+                        $conditions[] = 'p.sprint_planning = 1';
                     } else {
                         $conditions[] = 't.sprint_id = :sprintId';
                         $queryParams['sprintId'] = $params['sprintId'];
@@ -220,6 +223,7 @@ class TaskRoutes
                 if (($params['sprint'] ?? '') === 'backlog') {
                     $conditions[] = 't.in_sprint_backlog = 1';
                     $conditions[] = 't.sprint_id IS NULL';
+                    $conditions[] = 'p.sprint_planning = 1';
                 }
 
                 // Sorting
@@ -282,7 +286,7 @@ class TaskRoutes
                     'title' => 'required|min:1|max:255',
                     'description' => 'optional|nullable',
                     'notes' => 'optional|nullable',
-                    'status' => 'optional|in:todo,in_progress,review,done',
+                    'status' => 'optional|in:todo,in_progress,blocked,review,done',
                     'priority' => 'optional|in:low,medium,high,urgent',
                     'dueDate' => 'optional|nullable|iso8601',
                     'startDate' => 'optional|nullable|iso8601',
@@ -597,7 +601,7 @@ class TaskRoutes
                     'title' => 'optional|min:1|max:255',
                     'description' => 'optional|nullable',
                     'notes' => 'optional|nullable',
-                    'status' => 'optional|in:todo,in_progress,review,done',
+                    'status' => 'optional|in:todo,in_progress,blocked,review,done',
                     'priority' => 'optional|in:low,medium,high,urgent',
                     'dueDate' => 'optional|nullable|iso8601',
                     'startDate' => 'optional|nullable|iso8601',

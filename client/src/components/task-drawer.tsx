@@ -591,6 +591,7 @@ export function TaskDrawer({
                         <SelectContent>
                           <SelectItem value="todo">{STATUS_LABELS.todo}</SelectItem>
                           <SelectItem value="in_progress">{STATUS_LABELS.in_progress}</SelectItem>
+                          <SelectItem value="blocked">{STATUS_LABELS.blocked}</SelectItem>
                           <SelectItem value="review">{STATUS_LABELS.review}</SelectItem>
                           <SelectItem value="done">{STATUS_LABELS.done}</SelectItem>
                         </SelectContent>
