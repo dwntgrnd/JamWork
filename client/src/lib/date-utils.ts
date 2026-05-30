@@ -4,6 +4,37 @@
  */
 
 /**
+ * Parses a date value into a Date anchored in the local timezone.
+ *
+ * Date-only strings ("YYYY-MM-DD") are parsed by JS as UTC midnight, which can
+ * render as the previous day in negative-offset timezones. This constructs them
+ * from local Y/M/D components instead. Full ISO datetimes (which carry their own
+ * timezone/offset) and existing Date objects are passed through unchanged.
+ *
+ * @param value - Date string or Date object
+ * @returns Date in local time
+ */
+export function parseLocalDate(value: string | Date): Date {
+  if (value instanceof Date) return value;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+  return new Date(value);
+}
+
+/**
+ * Returns local midnight (start of day) for the given value, or for now when omitted.
+ * @param value - Date string or Date object (optional)
+ * @returns Date at 00:00:00.000 local time
+ */
+export function startOfLocalDay(value?: string | Date): Date {
+  const d = value !== undefined ? parseLocalDate(value) : new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
  * Formats a date string or Date object into a human-readable format.
  * @param dateStr - Date string or Date object
  * @returns Formatted date string (e.g., "Jan 15") or "—" if no date provided

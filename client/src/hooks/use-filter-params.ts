@@ -29,7 +29,7 @@ export function useFilterParams(options?: UseFilterParamsOptions): {
       status: status && status !== 'all' ? (status as TaskFilterState['status']) : undefined,
       priority: priority && priority !== 'all' ? (priority as TaskFilterState['priority']) : undefined,
       assigneeId: assigneeId && assigneeId !== 'all' ? assigneeId : undefined,
-      showCompleted: showCompleted === 'true',
+      showCompleted: showCompleted !== 'false',
       sortBy: (sortBy as TaskFilterState['sortBy']) || defaultSortBy,
       sortDir: (sortDir as TaskFilterState['sortDir']) || defaultSortDir,
     };
@@ -49,8 +49,8 @@ export function useFilterParams(options?: UseFilterParamsOptions): {
     if (newFilters.assigneeId) {
       params.set('assigneeId', newFilters.assigneeId);
     }
-    if (newFilters.showCompleted) {
-      params.set('showCompleted', 'true');
+    if (!newFilters.showCompleted) {
+      params.set('showCompleted', 'false');
     }
     if (newFilters.sortBy && newFilters.sortBy !== defaultSortBy) {
       params.set('sortBy', newFilters.sortBy);

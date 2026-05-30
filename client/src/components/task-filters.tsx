@@ -29,7 +29,7 @@ export function TaskFilters({ filters, onChange, hideProjectFilter = false }: Ta
     filters.status,
     filters.priority,
     filters.assigneeId,
-    filters.showCompleted,
+    !filters.showCompleted,
   ].filter(Boolean).length;
 
   useEffect(() => {
@@ -93,7 +93,7 @@ export function TaskFilters({ filters, onChange, hideProjectFilter = false }: Ta
       status: undefined,
       priority: undefined,
       assigneeId: undefined,
-      showCompleted: false,
+      showCompleted: true,
     });
   };
 

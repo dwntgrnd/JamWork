@@ -287,6 +287,41 @@ export function TaskList({
     }
   };
 
+  const handleToggleSubtask = async (taskId: string, subtask: Subtask) => {
+    const nextCompleted = !subtask.completed;
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              subtasks: task.subtasks?.map((s) =>
+                s.id === subtask.id ? { ...s, completed: nextCompleted } : s,
+              ),
+            }
+          : task,
+      ),
+    );
+    try {
+      await apiPut(`/tasks/${taskId}/subtasks/${subtask.id}`, {
+        completed: nextCompleted,
+      });
+    } catch (err) {
+      console.error("Failed to toggle subtask:", err);
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                subtasks: task.subtasks?.map((s) =>
+                  s.id === subtask.id ? { ...s, completed: !nextCompleted } : s,
+                ),
+              }
+            : task,
+        ),
+      );
+    }
+  };
+
   const handleSubtaskInputKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     taskId: string,
@@ -777,7 +812,11 @@ export function TaskList({
                             <TableCell className="max-w-0 w-[35%]">
                               <div className="flex items-center gap-2">
                                 <span
-                                  className="text-left hover:text-interactive text-sm font-semibold truncate"
+                                  className={cn(
+                                    "text-left hover:text-interactive text-sm font-semibold truncate",
+                                    task.status === "done" &&
+                                      "line-through text-muted-foreground",
+                                  )}
                                   title={task.title}
                                 >
                                   {task.title}
@@ -802,7 +841,10 @@ export function TaskList({
                                     >
                                       <Checkbox
                                         checked={subtask.completed}
-                                        disabled
+                                        onClick={(e) => e.stopPropagation()}
+                                        onCheckedChange={() =>
+                                          handleToggleSubtask(task.id, subtask)
+                                        }
                                       />
                                       <span
                                         className={cn(

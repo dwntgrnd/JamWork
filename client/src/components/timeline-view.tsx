@@ -1,9 +1,9 @@
 
-import { useEffect, useState, memo } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, memo } from 'react';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
 import { Task, Sprint, Milestone, Project, UserSummary, STATUS_LABELS, TaskFilterState, TaskStatus } from '@/types';
 import { getPriorityDotColor } from '@/lib/style-tokens';
-import { getDateUrgencyInfo } from '@/lib/date-utils';
+import { getDateUrgencyInfo, parseLocalDate, startOfLocalDay } from '@/lib/date-utils';
 import { Button } from '@/components/ui/button';
 import { TaskDrawer } from '@/components/task-drawer';
 import {
@@ -70,6 +70,11 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('week');
   const [dateOffset, setDateOffset] = useState(0);
   const [editTask, setEditTask] = useState<Task | null>(null);
+
+  // Horizontal scroll container, so we can center the "today" line on open / Today click.
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const hasCenteredRef = useRef(false);
+  const [recenterNonce, setRecenterNonce] = useState(0);
 
   // Milestone management state
   const [showMilestoneDialog, setShowMilestoneDialog] = useState(false);
@@ -296,27 +301,27 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
 
     // Collect all dates from filtered tasks
     filteredTasks.forEach((task) => {
-      if (task.startDate) dates.push(new Date(task.startDate));
-      if (task.dueDate) dates.push(new Date(task.dueDate));
+      if (task.startDate) dates.push(parseLocalDate(task.startDate));
+      if (task.dueDate) dates.push(parseLocalDate(task.dueDate));
     });
 
     // Collect dates from projects (global mode)
     if (isGlobal) {
       projects.forEach((proj) => {
-        if (proj.startDate) dates.push(new Date(proj.startDate));
-        if (proj.endDate) dates.push(new Date(proj.endDate));
+        if (proj.startDate) dates.push(parseLocalDate(proj.startDate));
+        if (proj.endDate) dates.push(parseLocalDate(proj.endDate));
       });
     }
 
     // Collect all dates from milestones
     milestones.forEach((milestone) => {
-      dates.push(new Date(milestone.date));
+      dates.push(parseLocalDate(milestone.date));
     });
 
     // Collect all dates from sprints
     sprints.forEach((sprint) => {
-      dates.push(new Date(sprint.startDate));
-      dates.push(new Date(sprint.endDate));
+      dates.push(parseLocalDate(sprint.startDate));
+      dates.push(parseLocalDate(sprint.endDate));
     });
 
     // Default range if no dates
@@ -358,10 +363,15 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
     adjustedEnd.setMonth(adjustedEnd.getMonth() + dateOffset);
   }
 
+  // Normalized local-midnight origin shared by columns, task bars, and the today line.
+  // Anchoring everything to one start-of-day reference keeps them aligned and avoids
+  // timezone/hour-of-day drift in the position math.
+  const originStart = startOfLocalDay(adjustedStart);
+
   // Generate time columns based on zoom level
   const generateTimeColumns = () => {
     const columns: { date: Date; label: string }[] = [];
-    const current = new Date(adjustedStart);
+    const current = new Date(originStart);
 
     while (current <= adjustedEnd) {
       let label = '';
@@ -388,21 +398,43 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
   const timeColumns = generateTimeColumns();
 
   // Calculate pixel width per day
-  const pixelsPerDay = zoomLevel === 'day' ? 40 : zoomLevel === 'week' ? 120 / 7 : 30 / 30;
+  const pixelsPerDay = zoomLevel === 'day' ? 40 : zoomLevel === 'week' ? 120 / 7 : 120 / 30;
   const columnWidth = zoomLevel === 'day' ? 40 : zoomLevel === 'week' ? 120 : 120;
 
-  // Calculate position for a date
+  // Month mode renders one fixed-width column per calendar month (variable day counts),
+  // so positions must be measured in calendar months + fraction-through-the-month rather
+  // than on the uniform day scale used by day/week mode. hourAccurate keeps the time of
+  // day (for the live today line); bars pass false so they sit at the day boundary.
+  const getMonthPosition = (d: Date, hourAccurate: boolean): number => {
+    const monthsFromOrigin =
+      (d.getFullYear() - originStart.getFullYear()) * 12 +
+      (d.getMonth() - originStart.getMonth());
+    const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    let dayPart = d.getDate() - 1;
+    if (hourAccurate) {
+      dayPart += (d.getHours() * 60 + d.getMinutes()) / (24 * 60);
+    }
+    return (monthsFromOrigin + dayPart / daysInMonth) * columnWidth;
+  };
+
+  // Calculate position for a date (day-granular: bars snap to whole columns).
   const getDatePosition = (date: Date | string): number => {
-    const d = new Date(date);
-    const daysSinceStart = Math.floor(
-      (d.getTime() - adjustedStart.getTime()) / (1000 * 60 * 60 * 24)
+    if (zoomLevel === 'month') {
+      return getMonthPosition(startOfLocalDay(date), false);
+    }
+    const daysSinceStart = Math.round(
+      (startOfLocalDay(date).getTime() - originStart.getTime()) / (1000 * 60 * 60 * 24)
     );
     return daysSinceStart * pixelsPerDay;
   };
 
-  // Get today's position
+  // Get today's position. Unlike task bars, the today line is NOT snapped to a day
+  // boundary — keeping the time of day makes it hour-accurate within today's column.
   const today = new Date();
-  const todayPosition = getDatePosition(today);
+  const todayPosition =
+    zoomLevel === 'month'
+      ? getMonthPosition(today, true)
+      : ((today.getTime() - originStart.getTime()) / (1000 * 60 * 60 * 24)) * pixelsPerDay;
   const isTodayVisible =
     today >= adjustedStart && today <= adjustedEnd;
 
@@ -433,7 +465,42 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
 
   const handleToday = () => {
     setDateOffset(0);
+    // Bump the nonce so re-centering fires even when dateOffset was already 0
+    // (no state change would otherwise re-run the effect).
+    setRecenterNonce((n) => n + 1);
   };
+
+  // Scroll so the today line sits in the horizontal center of the viewport.
+  const centerOnToday = () => {
+    const container = scrollContainerRef.current;
+    if (!container || !isTodayVisible) return;
+    requestAnimationFrame(() => {
+      container.scrollLeft = Math.max(0, todayPosition - container.clientWidth / 2);
+    });
+  };
+
+  // Center once after the timeline data first loads.
+  useLayoutEffect(() => {
+    if (loading || hasCenteredRef.current) return;
+    centerOnToday();
+    hasCenteredRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  // Re-center when the Today button is clicked.
+  useEffect(() => {
+    if (recenterNonce === 0) return;
+    centerOnToday();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recenterNonce]);
+
+  // Re-center whenever the zoom level changes (day / week / month). Left-right
+  // navigation deliberately does not re-center.
+  useEffect(() => {
+    if (loading) return;
+    centerOnToday();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoomLevel]);
 
   if (loading) {
     return (
@@ -467,7 +534,12 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
               )}
             />
           )}
-          <span className="text-sm font-medium text-foreground truncate flex-1">
+          <span
+            className={cn(
+              'text-sm font-medium text-foreground truncate flex-1',
+              task.status === 'done' && 'line-through text-muted-foreground'
+            )}
+          >
             {task.title}
           </span>
           <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">
@@ -674,7 +746,13 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
                           )}
                         />
                       )}
-                      <div className="text-sm truncate flex-1 text-foreground" title={row.task.title}>
+                      <div
+                        className={cn(
+                          'text-sm truncate flex-1 text-foreground',
+                          row.task.status === 'done' && 'line-through text-muted-foreground'
+                        )}
+                        title={row.task.title}
+                      >
                         {row.task.title}
                       </div>
                       {row.task.assignees && row.task.assignees.length > 0 && (
@@ -696,7 +774,7 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
             </div>
 
             {/* Scrollable timeline area */}
-            <div className="flex-1 overflow-x-auto">
+            <div ref={scrollContainerRef} className="flex-1 overflow-x-auto">
               <div style={{ width: totalWidth }} className="relative">
                 {/* Time axis header */}
                 <div className="h-16 border-b flex bg-card sticky top-0 z-10">
@@ -911,7 +989,8 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
                               className={cn(
                                 'absolute top-[6px] h-6 rounded-md cursor-pointer hover:shadow-md transition-shadow z-10',
                                 getStatusColor(task.status),
-                                isOverdue(task.dueDate, task.status) && 'ring-2 ring-destructive/50'
+                                isOverdue(task.dueDate, task.status) && 'ring-2 ring-destructive/50',
+                                task.status === 'done' && 'opacity-60'
                               )}
                               style={{
                                 left: getDatePosition(task.startDate),
@@ -976,7 +1055,8 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
                                 className={cn(
                                   'w-3 h-3 rounded-full border-2 border-white shadow-md',
                                   getStatusColor(task.status),
-                                  isOverdue(task.dueDate, task.status) && 'ring-2 ring-destructive/50'
+                                  isOverdue(task.dueDate, task.status) && 'ring-2 ring-destructive/50',
+                                  task.status === 'done' && 'opacity-60'
                                 )}
                               />
                             </div>
@@ -1021,7 +1101,8 @@ const TimelineViewComponent = ({ projectId, filters }: TimelineViewProps) => {
                               <div
                                 className={cn(
                                   'w-3 h-3 rounded-full border-2 border-white shadow-md',
-                                  getStatusColor(task.status)
+                                  getStatusColor(task.status),
+                                  task.status === 'done' && 'opacity-60'
                                 )}
                               />
                             </div>

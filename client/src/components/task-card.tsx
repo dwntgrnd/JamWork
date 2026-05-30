@@ -61,7 +61,13 @@ const TaskCardComponent = ({ task, onClick, dragHandleProps }: TaskCardProps) =>
         }}
       >
         {/* Title section (dominant, no priority dot) */}
-        <h3 className="text-sm font-medium line-clamp-2 mb-2" title={task.title}>
+        <h3
+          className={cn(
+            "text-sm font-medium line-clamp-2 mb-2",
+            task.status === "done" && "line-through text-muted-foreground",
+          )}
+          title={task.title}
+        >
           {task.title}
         </h3>
 
