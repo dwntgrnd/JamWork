@@ -187,6 +187,11 @@ class TaskRoutes
                     $queryParams['status'] = $params['status'];
                 }
 
+                // Filter: excludeCompleted — hide done tasks ("Show completed" off)
+                if (($params['excludeCompleted'] ?? '') === 'true') {
+                    $conditions[] = "t.status != 'done'";
+                }
+
                 // Filter: priority
                 if (!empty($params['priority'])) {
                     $conditions[] = 't.priority = :priority';

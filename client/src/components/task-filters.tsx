@@ -84,6 +84,9 @@ export function TaskFilters({ filters, onChange, hideProjectFilter = false }: Ta
     onChange({
       ...filters,
       showCompleted: checked,
+      // Hiding completed conflicts with a "Done" status filter (would empty the
+      // list). The checkbox wins: clear the Done filter when completed are hidden.
+      status: !checked && filters.status === 'done' ? undefined : filters.status,
     });
   };
 
@@ -119,7 +122,7 @@ export function TaskFilters({ filters, onChange, hideProjectFilter = false }: Ta
               <SelectItem value="in_progress">{STATUS_LABELS.in_progress}</SelectItem>
               <SelectItem value="blocked">{STATUS_LABELS.blocked}</SelectItem>
               <SelectItem value="review">{STATUS_LABELS.review}</SelectItem>
-              <SelectItem value="done">{STATUS_LABELS.done}</SelectItem>
+              <SelectItem value="done" disabled={!filters.showCompleted}>{STATUS_LABELS.done}</SelectItem>
             </SelectContent>
           </Select>
         </div>
