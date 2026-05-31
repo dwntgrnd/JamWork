@@ -45,13 +45,15 @@ cat > "$STAGE_DIR/README.md" << 'DEPLOY_README'
 
 Lightweight task tracking for small teams.
 
-## Installation
+## Fresh install
 
-1. Upload all files in this folder to your web server's document root via SFTP
-2. Ensure the `api/` directory is writable (755)
-3. Create an empty MySQL database and note the credentials
-4. Visit your site URL — the installation wizard will guide you through setup
-5. Log in with the admin account you created during installation
+1. Upload the *contents* of this folder to your web server's document root
+   (via SFTP or your host's File Manager) — `index.html` and `api/` should sit
+   at the top of the web root.
+2. Ensure the `api/` directory is writable (755).
+3. Create an empty MySQL database and note the credentials.
+4. Visit your site URL — the installation wizard will guide you through setup.
+5. Log in with the admin account you created during installation.
 
 ## Requirements
 
@@ -59,16 +61,18 @@ Lightweight task tracking for small teams.
 - MySQL 8.0+
 - Apache with mod_rewrite enabled
 
-## After Installation
+## Updating an existing install
 
-- Invite your team: Settings → Team Members
-- Create your first project to start tracking work
-- Configure email notifications by editing `api/.env` (if skipped during setup)
+**Do NOT run the installer to update — it is for fresh installs only.**
 
-## Reinstalling
+Updating is a careful file-swap that must preserve your `api/.env` (credentials)
+and `api/.installed` (the "already set up" marker). Overwrite files in place;
+never delete-then-replace the `api/` folder. Then apply any new database
+migrations listed in the release notes by hand.
 
-1. Delete `api/.installed` and `api/.env`
-2. Visit your site URL — the installer will reappear
+Full step-by-step update guide, including troubleshooting:
+
+  https://github.com/dwntgrnd/JamWork#updating-an-existing-install
 
 ## License
 
