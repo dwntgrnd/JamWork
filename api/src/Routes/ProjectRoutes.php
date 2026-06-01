@@ -32,6 +32,7 @@ class ProjectRoutes
             'startDate' => $row['start_date'] ? date('c', strtotime($row['start_date'])) : null,
             'endDate' => $row['end_date'] ? date('c', strtotime($row['end_date'])) : null,
             'sprintPlanning' => (bool) $row['sprint_planning'],
+            'defaultNotifyEnabled' => (bool) ($row['default_notify_enabled'] ?? 1),
             'createdAt' => date('c', strtotime($row['created_at'])),
             'updatedAt' => date('c', strtotime($row['updated_at'])),
             'createdById' => $row['created_by_id'],
@@ -75,6 +76,7 @@ class ProjectRoutes
                     'startDate' => 'optional|iso8601',
                     'endDate' => 'optional|iso8601',
                     'sprintPlanning' => 'optional|boolean',
+                    'defaultNotifyEnabled' => 'optional|boolean',
                 ]);
 
                 if (!empty($errors)) {
@@ -99,8 +101,8 @@ class ProjectRoutes
                 $id = Uuid::uuid4()->toString();
 
                 $stmt = $db->prepare(
-                    'INSERT INTO projects (id, name, description, start_date, end_date, sprint_planning, created_by_id)
-                     VALUES (:id, :name, :description, :start_date, :end_date, :sprint_planning, :created_by_id)'
+                    'INSERT INTO projects (id, name, description, start_date, end_date, sprint_planning, default_notify_enabled, created_by_id)
+                     VALUES (:id, :name, :description, :start_date, :end_date, :sprint_planning, :default_notify_enabled, :created_by_id)'
                 );
                 $stmt->execute([
                     'id' => $id,
@@ -109,6 +111,7 @@ class ProjectRoutes
                     'start_date' => Validator::toMySQLDate($data['startDate'] ?? null),
                     'end_date' => Validator::toMySQLDate($data['endDate'] ?? null),
                     'sprint_planning' => (int) ($data['sprintPlanning'] ?? true),
+                    'default_notify_enabled' => (int) ($data['defaultNotifyEnabled'] ?? true),
                     'created_by_id' => $userId,
                 ]);
 
@@ -143,6 +146,7 @@ class ProjectRoutes
                     'startDate' => 'optional|nullable|iso8601',
                     'endDate' => 'optional|nullable|iso8601',
                     'sprintPlanning' => 'optional|boolean',
+                    'defaultNotifyEnabled' => 'optional|boolean',
                 ]);
 
                 if (!empty($errors)) {
@@ -199,6 +203,11 @@ class ProjectRoutes
                 if (array_key_exists('sprintPlanning', $data)) {
                     $updates[] = 'sprint_planning = :sprint_planning';
                     $params['sprint_planning'] = (int) (bool) $data['sprintPlanning'];
+                }
+                if (array_key_exists('defaultNotifyEnabled', $data)) {
+                    // Not retroactive (PRD §9.3): only seeds future task creation.
+                    $updates[] = 'default_notify_enabled = :default_notify_enabled';
+                    $params['default_notify_enabled'] = (int) (bool) $data['defaultNotifyEnabled'];
                 }
 
                 if (!empty($updates)) {

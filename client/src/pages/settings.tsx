@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Sun, Moon, Monitor } from 'lucide-react';
 import { PasswordGenerator } from '@/components/password-generator';
 
@@ -17,8 +18,15 @@ export default function SettingsPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const { user, changePassword, updateProfile } = useAuth();
+  const { user, changePassword, updateProfile, updateNotificationPreferences } = useAuth();
   const { theme, setTheme } = useTheme();
+
+  const [notifyPrefs, setNotifyPrefs] = useState({
+    notifyAssigned: user?.notifyAssigned ?? true,
+    notifyUnassigned: user?.notifyUnassigned ?? true,
+    notifyChanged: user?.notifyChanged ?? true,
+  });
+  const [notifyError, setNotifyError] = useState('');
 
   const [profileEmail, setProfileEmail] = useState(user?.email || '');
   const [profileName, setProfileName] = useState(user?.displayName || '');
@@ -30,8 +38,26 @@ export default function SettingsPage() {
     if (user) {
       setProfileEmail(user.email);
       setProfileName(user.displayName);
+      setNotifyPrefs({
+        notifyAssigned: user.notifyAssigned ?? true,
+        notifyUnassigned: user.notifyUnassigned ?? true,
+        notifyChanged: user.notifyChanged ?? true,
+      });
     }
   }, [user]);
+
+  const handleNotifyToggle = async (key: keyof typeof notifyPrefs, value: boolean) => {
+    const previous = notifyPrefs;
+    const next = { ...notifyPrefs, [key]: value };
+    setNotifyPrefs(next);
+    setNotifyError('');
+    try {
+      await updateNotificationPreferences(next);
+    } catch (err: any) {
+      setNotifyPrefs(previous); // revert on failure
+      setNotifyError(err.message || 'Failed to update notification preferences');
+    }
+  };
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,6 +226,56 @@ export default function SettingsPage() {
                 <p className="text-xs text-muted-foreground">
                   System theme follows your device's color scheme preference
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Email notifications</CardTitle>
+              <CardDescription>Choose which task emails you receive</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="notify-assigned">Assigned to me</Label>
+                    <p className="text-xs text-muted-foreground">When someone assigns you to a task</p>
+                  </div>
+                  <Switch
+                    id="notify-assigned"
+                    checked={notifyPrefs.notifyAssigned}
+                    onCheckedChange={(v) => handleNotifyToggle('notifyAssigned', v)}
+                  />
+                </div>
+
+                <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="notify-unassigned">Removed from a task</Label>
+                    <p className="text-xs text-muted-foreground">When someone removes you from a task</p>
+                  </div>
+                  <Switch
+                    id="notify-unassigned"
+                    checked={notifyPrefs.notifyUnassigned}
+                    onCheckedChange={(v) => handleNotifyToggle('notifyUnassigned', v)}
+                  />
+                </div>
+
+                <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="notify-changed">Updates to my tasks</Label>
+                    <p className="text-xs text-muted-foreground">When status, due date, or priority changes on a task you're assigned to</p>
+                  </div>
+                  <Switch
+                    id="notify-changed"
+                    checked={notifyPrefs.notifyChanged}
+                    onCheckedChange={(v) => handleNotifyToggle('notifyChanged', v)}
+                  />
+                </div>
+
+                {notifyError && (
+                  <div className="text-sm text-destructive">{notifyError}</div>
+                )}
               </div>
             </CardContent>
           </Card>

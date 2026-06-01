@@ -42,6 +42,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import {
   Check,
   X,
@@ -95,6 +96,7 @@ export function TaskDrawer({
     task?.recurrence || null
   );
   const [sprintId, setSprintId] = useState<string | null>(task?.sprintId || defaultSprintId || null);
+  const [notifyEnabled, setNotifyEnabled] = useState(task?.notifyEnabled ?? true);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>(
     task?.assignees?.map((a) => a.userId) || []
   );
@@ -132,6 +134,26 @@ export function TaskDrawer({
     fetchUsers();
     fetchSprints();
   }, []);
+
+  // In create mode, seed the task-wide notification flag from the selected project's default.
+  useEffect(() => {
+    if (mode === 'create' && projectId) {
+      const p = projects.find((proj) => proj.id === projectId);
+      if (p) setNotifyEnabled(p.defaultNotifyEnabled !== false);
+    }
+  }, [mode, projectId, projects]);
+
+  const handleNotifyEnabledChange = async (value: boolean) => {
+    const prev = notifyEnabled;
+    setNotifyEnabled(value);
+    if (mode === 'edit') {
+      try {
+        await saveField('notifyEnabled', value);
+      } catch {
+        setNotifyEnabled(prev); // revert on failure
+      }
+    }
+  };
 
   const fetchProjects = async () => {
     try {
@@ -400,6 +422,7 @@ export function TaskDrawer({
         recurrence: recurrence || undefined,
         sprintId: sprintId || undefined,
         assigneeIds: selectedAssignees,
+        notifyEnabled,
       };
 
       if (mode === 'create') {
@@ -793,6 +816,23 @@ export function TaskDrawer({
                       </div>
                     )}
                 </div>
+              </div>
+
+              {/* === NOTIFICATIONS — task-wide flag === */}
+              <div className="flex items-start justify-between gap-4 rounded-md border border-field-border bg-field-bg p-3">
+                <div className="space-y-0.5">
+                  <label htmlFor="task-notify-enabled" className="text-sm font-medium text-foreground">
+                    Email notifications for this task
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    When off, no assignment, removal, or update emails are sent for this task.
+                  </p>
+                </div>
+                <Switch
+                  id="task-notify-enabled"
+                  checked={notifyEnabled}
+                  onCheckedChange={handleNotifyEnabledChange}
+                />
               </div>
 
               {/* === ASSIGNEES — own section === */}

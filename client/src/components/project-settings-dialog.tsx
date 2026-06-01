@@ -40,6 +40,7 @@ export function ProjectSettingsDialog({
   const [startDate, setStartDate] = useState(toDateInput(project.startDate));
   const [endDate, setEndDate] = useState(toDateInput(project.endDate));
   const [sprintPlanning, setSprintPlanning] = useState(project.sprintPlanning !== false);
+  const [defaultNotifyEnabled, setDefaultNotifyEnabled] = useState(project.defaultNotifyEnabled !== false);
   const [saving, setSaving] = useState(false);
 
   // Re-sync form when a different project is opened or the dialog re-opens.
@@ -50,6 +51,7 @@ export function ProjectSettingsDialog({
       setStartDate(toDateInput(project.startDate));
       setEndDate(toDateInput(project.endDate));
       setSprintPlanning(project.sprintPlanning !== false);
+      setDefaultNotifyEnabled(project.defaultNotifyEnabled !== false);
     }
   }, [open, project]);
 
@@ -69,6 +71,7 @@ export function ProjectSettingsDialog({
           startDate: startDate || null,
           endDate: endDate || null,
           sprintPlanning,
+          defaultNotifyEnabled,
         }
       );
       window.dispatchEvent(new Event('projects-updated'));
@@ -150,6 +153,21 @@ export function ProjectSettingsDialog({
               id="settings-sprint-planning"
               checked={sprintPlanning}
               onCheckedChange={setSprintPlanning}
+            />
+          </div>
+
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="settings-default-notify">Default email notifications for new tasks</Label>
+              <p className="text-xs text-muted-foreground">
+                Seeds the "Email notifications for this task" flag when a task is created in
+                this project. Changing it does not affect existing tasks.
+              </p>
+            </div>
+            <Switch
+              id="settings-default-notify"
+              checked={defaultNotifyEnabled}
+              onCheckedChange={setDefaultNotifyEnabled}
             />
           </div>
         </div>

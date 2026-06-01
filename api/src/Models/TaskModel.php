@@ -63,6 +63,7 @@ class TaskModel
             'recurrence' => $row['recurrence'],
             'sprintId' => $row['sprint_id'],
             'inSprintBacklog' => (bool) $row['in_sprint_backlog'],
+            'notifyEnabled' => (bool) ($row['notify_enabled'] ?? 1),
             'projectId' => $row['project_id'],
             'createdById' => $row['created_by_id'],
             'createdAt' => date('c', strtotime($row['created_at'])),

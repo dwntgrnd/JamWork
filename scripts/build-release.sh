@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-VERSION="2.1.1"
+VERSION="2.2.0"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
@@ -32,6 +32,7 @@ cp -R api "$STAGE_DIR/api"
 rm -f "$STAGE_DIR/api/.env"
 rm -f "$STAGE_DIR/api/.env.production"
 rm -f "$STAGE_DIR/api/.installed"
+rm -rf "$STAGE_DIR/api/tests"
 
 # Copy root .htaccess
 cp .htaccess "$STAGE_DIR/.htaccess"

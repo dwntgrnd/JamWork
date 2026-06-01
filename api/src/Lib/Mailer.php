@@ -154,4 +154,82 @@ class Mailer
             $this->mail->clearAddresses();
         }
     }
+
+    public function sendTaskUnassignedEmail(
+        string $toEmail,
+        string $toDisplayName,
+        string $assignerDisplayName,
+        string $taskTitle,
+        string $projectName,
+        string $taskUrl,
+        string $workspaceName
+    ): array {
+        try {
+            $this->mail->addAddress($toEmail, $toDisplayName);
+            $this->mail->Subject = "{$assignerDisplayName} removed you from a task in {$workspaceName}";
+
+            $templatePath = __DIR__ . '/../Mail/templates/task-unassigned.html';
+            $html = file_get_contents($templatePath);
+
+            $html = str_replace(
+                ['{{WORKSPACE_NAME}}', '{{DISPLAY_NAME}}', '{{ASSIGNER_NAME}}', '{{TASK_TITLE}}', '{{PROJECT_NAME}}', '{{TASK_URL}}'],
+                [htmlspecialchars($workspaceName), htmlspecialchars($toDisplayName), htmlspecialchars($assignerDisplayName), htmlspecialchars($taskTitle), htmlspecialchars($projectName), htmlspecialchars($taskUrl)],
+                $html
+            );
+
+            $this->mail->Body = $html;
+            $this->mail->AltBody = "Hi {$toDisplayName},\n\n"
+                . "{$assignerDisplayName} removed you from a task in {$projectName}.\n\n"
+                . "Task: {$taskTitle}\n\n"
+                . "View task: {$taskUrl}";
+
+            $this->mail->send();
+
+            return ['sent' => true, 'error' => null];
+        } catch (\Exception $e) {
+            error_log('Mailer error (task unassigned): ' . $this->mail->ErrorInfo);
+            return ['sent' => false, 'error' => $this->mail->ErrorInfo];
+        } finally {
+            $this->mail->clearAddresses();
+        }
+    }
+
+    public function sendTaskChangedEmail(
+        string $toEmail,
+        string $toDisplayName,
+        string $editorDisplayName,
+        string $taskTitle,
+        string $projectName,
+        string $taskUrl,
+        string $workspaceName
+    ): array {
+        try {
+            $this->mail->addAddress($toEmail, $toDisplayName);
+            $this->mail->Subject = "{$editorDisplayName} updated a task you're on in {$workspaceName}";
+
+            $templatePath = __DIR__ . '/../Mail/templates/task-changed.html';
+            $html = file_get_contents($templatePath);
+
+            $html = str_replace(
+                ['{{WORKSPACE_NAME}}', '{{DISPLAY_NAME}}', '{{ASSIGNER_NAME}}', '{{TASK_TITLE}}', '{{PROJECT_NAME}}', '{{TASK_URL}}'],
+                [htmlspecialchars($workspaceName), htmlspecialchars($toDisplayName), htmlspecialchars($editorDisplayName), htmlspecialchars($taskTitle), htmlspecialchars($projectName), htmlspecialchars($taskUrl)],
+                $html
+            );
+
+            $this->mail->Body = $html;
+            $this->mail->AltBody = "Hi {$toDisplayName},\n\n"
+                . "{$editorDisplayName} updated a task you're assigned to in {$projectName}.\n\n"
+                . "Task: {$taskTitle}\n\n"
+                . "View task: {$taskUrl}";
+
+            $this->mail->send();
+
+            return ['sent' => true, 'error' => null];
+        } catch (\Exception $e) {
+            error_log('Mailer error (task changed): ' . $this->mail->ErrorInfo);
+            return ['sent' => false, 'error' => $this->mail->ErrorInfo];
+        } finally {
+            $this->mail->clearAddresses();
+        }
+    }
 }

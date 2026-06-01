@@ -32,6 +32,9 @@ export interface User {
   displayName: string;
   role: UserRole;
   mustResetPassword?: boolean;
+  notifyAssigned?: boolean;
+  notifyUnassigned?: boolean;
+  notifyChanged?: boolean;
   createdAt?: string;
 }
 
@@ -51,6 +54,7 @@ export interface Project {
   startDate?: Date | string;
   endDate?: Date | string;
   sprintPlanning?: boolean;
+  defaultNotifyEnabled?: boolean;
   createdById: string;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -152,6 +156,7 @@ export interface Task {
   startDate?: Date | string;
   sortOrder: number;
   recurrence?: RecurrenceType | null;
+  notifyEnabled?: boolean;
   sprintId?: string | null;
   sprint?: {
     id: string;

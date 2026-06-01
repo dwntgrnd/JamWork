@@ -11,6 +11,13 @@ interface AuthContextType {
   resetPassword: (newPassword: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   updateProfile: (email: string, displayName: string) => Promise<User>;
+  updateNotificationPreferences: (prefs: NotificationPreferences) => Promise<User>;
+}
+
+interface NotificationPreferences {
+  notifyAssigned: boolean;
+  notifyUnassigned: boolean;
+  notifyChanged: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -75,6 +82,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return response.user;
   };
 
+  const updateNotificationPreferences = async (prefs: NotificationPreferences): Promise<User> => {
+    const response = await apiPut<{ user: User }>('/auth/profile', prefs);
+    setUser(response.user);
+    return response.user;
+  };
+
   const value = {
     user,
     loading,
@@ -84,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resetPassword,
     changePassword,
     updateProfile,
+    updateNotificationPreferences,
   };
 
   return (

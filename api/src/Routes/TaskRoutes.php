@@ -3,7 +3,7 @@
 namespace JamWork\Routes;
 
 use JamWork\Lib\Database;
-use JamWork\Lib\Mailer;
+use JamWork\Lib\NotificationService;
 use JamWork\Lib\Validator;
 use JamWork\Middleware\AuthMiddleware;
 use JamWork\Models\TaskModel;
@@ -301,6 +301,7 @@ class TaskRoutes
                     'projectId' => 'required|uuid',
                     'assigneeIds' => 'optional|uuid_array',
                     'labelIds' => 'optional|uuid_array',
+                    'notifyEnabled' => 'optional|boolean',
                 ]);
 
                 if (!empty($errors)) {
@@ -317,14 +318,20 @@ class TaskRoutes
                     }
                 }
 
-                // Verify project exists
+                // Verify project exists (and read its notification default to seed the task flag)
                 $db = Database::getInstance();
-                $stmt = $db->prepare('SELECT id FROM projects WHERE id = :id');
+                $stmt = $db->prepare('SELECT id, default_notify_enabled FROM projects WHERE id = :id');
                 $stmt->execute(['id' => $data['projectId']]);
-                if (!$stmt->fetch()) {
+                $project = $stmt->fetch();
+                if (!$project) {
                     $response->getBody()->write(json_encode(['error' => 'Project not found']));
                     return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
                 }
+
+                // Seed the task-wide flag from the project default (PRD §9.2), unless explicitly set.
+                $notifyEnabled = array_key_exists('notifyEnabled', $data)
+                    ? ($data['notifyEnabled'] ? 1 : 0)
+                    : (int) $project['default_notify_enabled'];
 
                 $userId = $request->getAttribute('userId');
                 $id = Uuid::uuid4()->toString();
@@ -336,8 +343,8 @@ class TaskRoutes
                 $db->beginTransaction();
                 try {
                     $stmt = $db->prepare(
-                        'INSERT INTO tasks (id, title, description, notes, status, priority, effort, due_date, start_date, sort_order, recurrence, sprint_id, project_id, created_by_id)
-                         VALUES (:id, :title, :description, :notes, :status, :priority, :effort, :due_date, :start_date, :sort_order, :recurrence, :sprint_id, :project_id, :created_by_id)'
+                        'INSERT INTO tasks (id, title, description, notes, status, priority, effort, due_date, start_date, sort_order, recurrence, sprint_id, project_id, created_by_id, notify_enabled)
+                         VALUES (:id, :title, :description, :notes, :status, :priority, :effort, :due_date, :start_date, :sort_order, :recurrence, :sprint_id, :project_id, :created_by_id, :notify_enabled)'
                     );
                     $stmt->execute([
                         'id' => $id,
@@ -354,6 +361,7 @@ class TaskRoutes
                         'sprint_id' => $data['sprintId'] ?? null,
                         'project_id' => $data['projectId'],
                         'created_by_id' => $userId,
+                        'notify_enabled' => $notifyEnabled,
                     ]);
 
                     // Insert assignees
@@ -390,56 +398,21 @@ class TaskRoutes
                     throw $e;
                 }
 
-                // Send assignment notifications for new task assignees
-                if (!empty($assigneeIds) && Mailer::isConfigured()) {
-                    // Don't notify self-assignment
-                    $addedUserIds = array_diff($assigneeIds, [$userId]);
-
-                    if (!empty($addedUserIds)) {
-                        try {
-                            // Batch lookup added users
-                            $placeholders = implode(',', array_fill(0, count($addedUserIds), '?'));
-                            $stmt = $db->prepare("SELECT id, email, display_name FROM users WHERE id IN ({$placeholders})");
-                            $stmt->execute(array_values($addedUserIds));
-                            $addedUsers = $stmt->fetchAll();
-
-                            // Assigner display name
-                            $stmt = $db->prepare('SELECT display_name FROM users WHERE id = ?');
-                            $stmt->execute([$userId]);
-                            $assignerName = $stmt->fetchColumn() ?: 'Someone';
-
-                            // Project name
-                            $stmt = $db->prepare('SELECT name FROM projects WHERE id = ?');
-                            $stmt->execute([$data['projectId']]);
-                            $projectName = $stmt->fetchColumn() ?: 'Unknown Project';
-
-                            // Workspace name
-                            $stmt = $db->prepare("SELECT value FROM workspace_settings WHERE `key` = 'workspace_name'");
-                            $stmt->execute();
-                            $workspaceName = $stmt->fetchColumn() ?: 'JamWork';
-
-                            $taskUrl = ($_ENV['APP_URL'] ?? '') . '/projects/' . $data['projectId'] . '?task=' . $id;
-
-                            $mailer = new Mailer();
-                            foreach ($addedUsers as $user) {
-                                $result = $mailer->sendTaskAssignmentEmail(
-                                    $user['email'],
-                                    $user['display_name'] ?? '',
-                                    $assignerName,
-                                    $data['title'],
-                                    $projectName,
-                                    $taskUrl,
-                                    $workspaceName
-                                );
-                                if (!$result['sent']) {
-                                    error_log('Task assignment email failed for user ' . $user['id'] . ': ' . $result['error']);
-                                }
-                            }
-                        } catch (\Exception $e) {
-                            error_log('Task assignment notification error: ' . $e->getMessage());
-                        }
-                    }
-                }
+                // Send assignment notifications (single decision point — PRD §5/§8).
+                NotificationService::dispatchForTaskSave(
+                    $db,
+                    [
+                        'id' => $id,
+                        'title' => $data['title'],
+                        'project_id' => $data['projectId'],
+                        'notify_enabled' => $notifyEnabled,
+                    ],
+                    $userId,
+                    [],          // no prior assignees on create
+                    $assigneeIds,
+                    false,       // no "changed" event on create
+                    true         // isCreate
+                );
 
                 // Re-fetch the created task with all relations
                 $stmt = $db->prepare(self::FETCH_QUERY . ' WHERE t.id = :id');
@@ -615,6 +588,7 @@ class TaskRoutes
                     'sprintId' => 'optional|nullable|uuid',
                     'assigneeIds' => 'optional|uuid_array',
                     'labelIds' => 'optional|uuid_array',
+                    'notifyEnabled' => 'optional|boolean',
                 ]);
 
                 if (!empty($errors)) {
@@ -695,6 +669,11 @@ class TaskRoutes
                 if (array_key_exists('sprintId', $data)) {
                     $updates[] = 'sprint_id = :sprint_id';
                     $updateParams['sprint_id'] = $data['sprintId'];
+                }
+                if (array_key_exists('notifyEnabled', $data)) {
+                    // Toggling the task flag is NOT itself a notifiable change (PRD §10.5).
+                    $updates[] = 'notify_enabled = :notify_enabled';
+                    $updateParams['notify_enabled'] = $data['notifyEnabled'] ? 1 : 0;
                 }
 
                 $userId = $request->getAttribute('userId');
@@ -786,8 +765,8 @@ class TaskRoutes
                         $cloneSortOrder = TaskModel::getNextSortOrder($existingTask['project_id']);
 
                         $stmt = $db->prepare(
-                            'INSERT INTO tasks (id, title, description, notes, status, priority, effort, due_date, start_date, sort_order, recurrence, sprint_id, project_id, created_by_id)
-                             VALUES (:id, :title, :description, :notes, :status, :priority, :effort, :due_date, :start_date, :sort_order, :recurrence, :sprint_id, :project_id, :created_by_id)'
+                            'INSERT INTO tasks (id, title, description, notes, status, priority, effort, due_date, start_date, sort_order, recurrence, sprint_id, project_id, created_by_id, notify_enabled)
+                             VALUES (:id, :title, :description, :notes, :status, :priority, :effort, :due_date, :start_date, :sort_order, :recurrence, :sprint_id, :project_id, :created_by_id, :notify_enabled)'
                         );
                         $stmt->execute([
                             'id' => $clonedTaskId,
@@ -804,6 +783,7 @@ class TaskRoutes
                             'sprint_id' => $existingTask['sprint_id'],
                             'project_id' => $existingTask['project_id'],
                             'created_by_id' => $userId,
+                            'notify_enabled' => (int) $existingTask['notify_enabled'],
                         ]);
 
                         // Clone pre-update assignees
@@ -841,59 +821,43 @@ class TaskRoutes
                     throw $e;
                 }
 
-                // Send assignment notifications for newly added assignees
-                if (array_key_exists('assigneeIds', $data) && Mailer::isConfigured()) {
-                    $existingAssigneeIdArray = array_column($existingAssigneeRows, 'user_id');
-                    $newAssigneeIds = $data['assigneeIds'] ?? [];
-                    $addedUserIds = array_diff($newAssigneeIds, $existingAssigneeIdArray);
-                    // Don't notify self-assignment
-                    $addedUserIds = array_diff($addedUserIds, [$userId]);
-
-                    if (!empty($addedUserIds)) {
-                        try {
-                            // Batch lookup added users
-                            $placeholders = implode(',', array_fill(0, count($addedUserIds), '?'));
-                            $stmt = $db->prepare("SELECT id, email, display_name FROM users WHERE id IN ({$placeholders})");
-                            $stmt->execute(array_values($addedUserIds));
-                            $addedUsers = $stmt->fetchAll();
-
-                            // Assigner display name
-                            $stmt = $db->prepare('SELECT display_name FROM users WHERE id = ?');
-                            $stmt->execute([$userId]);
-                            $assignerName = $stmt->fetchColumn() ?: 'Someone';
-
-                            // Project name
-                            $stmt = $db->prepare('SELECT name FROM projects WHERE id = ?');
-                            $stmt->execute([$existingTask['project_id']]);
-                            $projectName = $stmt->fetchColumn() ?: 'Unknown Project';
-
-                            // Workspace name
-                            $stmt = $db->prepare("SELECT value FROM workspace_settings WHERE `key` = 'workspace_name'");
-                            $stmt->execute();
-                            $workspaceName = $stmt->fetchColumn() ?: 'JamWork';
-
-                            $taskUrl = ($_ENV['APP_URL'] ?? '') . '/projects/' . $existingTask['project_id'] . '?task=' . $id;
-
-                            $mailer = new Mailer();
-                            foreach ($addedUsers as $user) {
-                                $result = $mailer->sendTaskAssignmentEmail(
-                                    $user['email'],
-                                    $user['display_name'] ?? '',
-                                    $assignerName,
-                                    $data['title'] ?? $existingTask['title'],
-                                    $projectName,
-                                    $taskUrl,
-                                    $workspaceName
-                                );
-                                if (!$result['sent']) {
-                                    error_log('Task assignment email failed for user ' . $user['id'] . ': ' . $result['error']);
-                                }
-                            }
-                        } catch (\Exception $e) {
-                            error_log('Task assignment notification error: ' . $e->getMessage());
-                        }
-                    }
+                // Dispatch notifications (Assigned / Unassigned / Changed) — single decision point.
+                // §7 significant fields: status, priority, due_date. Title/notes/etc. are cosmetic.
+                $significantChanged = false;
+                if (isset($data['status']) && $data['status'] !== $existingTask['status']) {
+                    $significantChanged = true;
                 }
+                if (isset($data['priority']) && $data['priority'] !== $existingTask['priority']) {
+                    $significantChanged = true;
+                }
+                if (array_key_exists('dueDate', $data)
+                    && Validator::toMySQLDate($data['dueDate']) !== $existingTask['due_date']) {
+                    $significantChanged = true;
+                }
+
+                $oldAssigneeIds = array_column($existingAssigneeRows, 'user_id');
+                $newAssigneeIds = array_key_exists('assigneeIds', $data)
+                    ? ($data['assigneeIds'] ?? [])
+                    : $oldAssigneeIds; // assignees unchanged when not in the payload
+
+                $effectiveNotifyEnabled = array_key_exists('notifyEnabled', $data)
+                    ? ($data['notifyEnabled'] ? 1 : 0)
+                    : (int) $existingTask['notify_enabled'];
+
+                NotificationService::dispatchForTaskSave(
+                    $db,
+                    [
+                        'id' => $id,
+                        'title' => $data['title'] ?? $existingTask['title'],
+                        'project_id' => $existingTask['project_id'],
+                        'notify_enabled' => $effectiveNotifyEnabled,
+                    ],
+                    $userId,
+                    $oldAssigneeIds,
+                    $newAssigneeIds,
+                    $significantChanged,
+                    false
+                );
 
                 // Re-fetch updated task with full relations
                 $stmt = $db->prepare(self::FETCH_QUERY . ' WHERE t.id = :id');

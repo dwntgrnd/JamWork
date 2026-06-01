@@ -244,6 +244,10 @@ class AuthRoutes
                         'email' => $email,
                         'displayName' => $displayName,
                         'role' => 'admin',
+                        // New user → all notification preferences default ON.
+                        'notifyAssigned' => true,
+                        'notifyUnassigned' => true,
+                        'notifyChanged' => true,
                     ],
                 ]));
                 return $response
@@ -289,6 +293,9 @@ class AuthRoutes
                         'displayName' => $user['display_name'],
                         'role' => $user['role'],
                         'mustResetPassword' => (bool) $user['must_reset_password'],
+                        'notifyAssigned' => (bool) $user['notify_assigned'],
+                        'notifyUnassigned' => (bool) $user['notify_unassigned'],
+                        'notifyChanged' => (bool) $user['notify_changed'],
                     ],
                 ]));
                 return $response
@@ -310,7 +317,7 @@ class AuthRoutes
                 $userId = $request->getAttribute('userId');
                 $db = Database::getInstance();
 
-                $stmt = $db->prepare('SELECT id, email, display_name, role, must_reset_password FROM users WHERE id = :id');
+                $stmt = $db->prepare('SELECT id, email, display_name, role, must_reset_password, notify_assigned, notify_unassigned, notify_changed FROM users WHERE id = :id');
                 $stmt->execute(['id' => $userId]);
                 $user = $stmt->fetch();
 
@@ -329,6 +336,9 @@ class AuthRoutes
                         'displayName' => $user['display_name'],
                         'role' => $user['role'],
                         'mustResetPassword' => (bool) $user['must_reset_password'],
+                        'notifyAssigned' => (bool) $user['notify_assigned'],
+                        'notifyUnassigned' => (bool) $user['notify_unassigned'],
+                        'notifyChanged' => (bool) $user['notify_changed'],
                     ],
                 ]));
                 return $response
@@ -387,6 +397,9 @@ class AuthRoutes
                 $errors = Validator::validate($data, [
                     'email' => 'optional|email',
                     'displayName' => 'optional|min:1|max:100',
+                    'notifyAssigned' => 'optional|boolean',
+                    'notifyUnassigned' => 'optional|boolean',
+                    'notifyChanged' => 'optional|boolean',
                 ]);
 
                 if (!empty($errors)) {
@@ -433,6 +446,13 @@ class AuthRoutes
                     $params['display_name'] = trim($data['displayName']);
                 }
 
+                foreach (['notifyAssigned' => 'notify_assigned', 'notifyUnassigned' => 'notify_unassigned', 'notifyChanged' => 'notify_changed'] as $field => $column) {
+                    if (array_key_exists($field, $data)) {
+                        $updates[] = "{$column} = :{$column}";
+                        $params[$column] = $data[$field] ? 1 : 0;
+                    }
+                }
+
                 if (!empty($updates)) {
                     $sql = 'UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = :id';
                     $stmt = $db->prepare($sql);
@@ -440,7 +460,7 @@ class AuthRoutes
                 }
 
                 // Fetch updated user
-                $stmt = $db->prepare('SELECT id, email, display_name, role, must_reset_password FROM users WHERE id = :id');
+                $stmt = $db->prepare('SELECT id, email, display_name, role, must_reset_password, notify_assigned, notify_unassigned, notify_changed FROM users WHERE id = :id');
                 $stmt->execute(['id' => $userId]);
                 $updated = $stmt->fetch();
 
@@ -451,6 +471,9 @@ class AuthRoutes
                         'displayName' => $updated['display_name'],
                         'role' => $updated['role'],
                         'mustResetPassword' => (bool) $updated['must_reset_password'],
+                        'notifyAssigned' => (bool) $updated['notify_assigned'],
+                        'notifyUnassigned' => (bool) $updated['notify_unassigned'],
+                        'notifyChanged' => (bool) $updated['notify_changed'],
                     ],
                 ]));
                 return $response
