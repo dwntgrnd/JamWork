@@ -79,6 +79,59 @@ ALTER TABLE `projects`
 
 ---
 
+## Upgrading from older than v2.1.x
+
+The standard runbook below assumes production is on **v2.1.x** and therefore applies **only
+migration 004**. A host on **v2.0.x or earlier** is also missing **migration 003**
+(`projects.sprint_planning`, introduced in v2.1.0). The v2.2.0 code is a full file swap that
+includes the 2.1 sprint-planning feature, so it queries `projects.sprint_planning` — if you
+apply only 004, **the app will break** on that missing column.
+
+Code upgrades all-at-once (one file swap = every feature); the **database** upgrades by applying
+incremental migration deltas. So on an older host you must catch the DB up across **every**
+missing migration before/with the deploy.
+
+Migration history by version:
+
+| Version | DB migrations present |
+|---|---|
+| v2.0.0 / v2.0.1 | 001, 002 |
+| v2.1.0 / v2.1.1 | 001, 002, **003** |
+| v2.2.0 (this release) | 001, 002, 003, **004** |
+
+### Path A — preserve the data (data-safe delta)
+
+After the **backup** (step 1 below), apply each missing migration **in order**, using these
+guards (apply only when the check returns `0`):
+
+```sql
+-- 002 (password reset): inherently safe — CREATE TABLE IF NOT EXISTS.
+-- Just run api/migrations/002_password_reset_tokens.sql as-is.
+
+-- 003 (sprint planning):
+SELECT COUNT(*) FROM information_schema.columns
+WHERE table_schema = DATABASE() AND table_name = 'projects' AND column_name = 'sprint_planning';
+-- if 0, run api/migrations/003_project_sprint_planning.sql
+
+-- 004 (notifications):
+SELECT COUNT(*) FROM information_schema.columns
+WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'notify_assigned';
+-- if 0, run api/migrations/004_notification_preferences.sql
+```
+
+Then continue with **step 3 (deploy the v2.2.0 package)** below. Migration 001 (the initial
+schema) must already be present, or the app could never have run. If the host predates v2.0.0 it
+may also be missing 002 — running it is harmless when the table already exists.
+
+### Path B — throwaway test box (fresh install, DESTROYS data)
+
+If the host's existing data is disposable, skip the delta entirely: drop and recreate the
+database, delete `api/.installed`, deploy the v2.2.0 ZIP, and run `install.php`. The v2.2.0
+installer's migration list runs **all four** migrations (001→004) in order. **Only** do this when
+losing that site's data is acceptable.
+
+---
+
 ## Deployment runbook
 
 Run in this order when the batch is finalized.
