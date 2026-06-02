@@ -76,9 +76,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint (non-blocking until backlog cleared — see docs/audits/2026-06-01-code-audit.md §6)
+      - name: Lint
         run: npm run lint
-        continue-on-error: true
 
       - name: Type-check
         run: npx tsc -b
