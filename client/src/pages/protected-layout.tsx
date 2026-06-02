@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sun, Moon, Menu, X, User, LogOut, Settings, Shield } from 'lucide-react';
+import { Sun, Moon, Menu, X, LogOut, Settings, Shield } from 'lucide-react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router';
 import { apiGet } from '@/lib/api';
 
@@ -33,7 +33,7 @@ export default function ProtectedLayout() {
     window.location.href = '/login';
   };
 
-  const projectIdMatch = pathname.match(/\/projects\/([^\/]+)/);
+  const projectIdMatch = pathname.match(/\/projects\/([^/]+)/);
   const currentProjectId = projectIdMatch ? projectIdMatch[1] : null;
 
   useEffect(() => {

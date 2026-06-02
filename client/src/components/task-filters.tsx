@@ -21,7 +21,7 @@ interface TaskFiltersProps {
   hideProjectFilter?: boolean;
 }
 
-export function TaskFilters({ filters, onChange, hideProjectFilter = false }: TaskFiltersProps) {
+export function TaskFilters({ filters, onChange }: TaskFiltersProps) {
   const [users, setUsers] = useState<UserSummary[]>([]);
 
   // Compute active filter count (non-default values)
@@ -33,17 +33,16 @@ export function TaskFilters({ filters, onChange, hideProjectFilter = false }: Ta
   ].filter(Boolean).length;
 
   useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const data = await apiGet<{ users: UserSummary[] }>('/auth/users');
+        setUsers(data.users);
+      } catch (err) {
+        console.error('Failed to fetch users:', err);
+      }
+    };
     fetchUsers();
   }, []);
-
-  const fetchUsers = async () => {
-    try {
-      const data = await apiGet<{ users: UserSummary[] }>('/auth/users');
-      setUsers(data.users);
-    } catch (err) {
-      console.error('Failed to fetch users:', err);
-    }
-  };
 
   const handleStatusChange = (value: string) => {
     onChange({

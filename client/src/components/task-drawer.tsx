@@ -1,6 +1,6 @@
 
 import { useEffect, useState, useMemo } from 'react';
-import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
+import { apiGet, apiPost, apiPut, apiDelete, getErrorMessage } from '@/lib/api';
 import {
   Task,
   Project,
@@ -124,7 +124,7 @@ export function TaskDrawer({
   const [sprints, setSprints] = useState<Sprint[]>([]);
 
   // Auto-save hook (edit mode only)
-  const { saveField, status: saveStatus, error: saveError, clearError } = useAutoSave({
+  const { saveField, status: saveStatus, error: saveError } = useAutoSave({
     taskId: task?.id || '',
     enabled: mode === 'edit' && !!task,
   });
@@ -341,9 +341,9 @@ export function TaskDrawer({
         await apiPut(`/tasks/${task.id}/move`, { projectId: newProjectId });
         // Task has moved projects, refresh parent view
         onSave();
-      } catch (err: any) {
+      } catch (err: unknown) {
         setProjectId(prev); // revert on failure
-        setError(err.message || 'Failed to move task');
+        setError(getErrorMessage(err, 'Failed to move task'));
       }
     } else {
       // Create mode: just update state
@@ -368,8 +368,8 @@ export function TaskDrawer({
       setNewProjectName('');
       setShowNewProjectForm(false);
       window.dispatchEvent(new Event('projects-updated'));
-    } catch (err: any) {
-      setError(err.message || 'Failed to create project');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to create project'));
     } finally {
       setCreatingProject(false);
     }
@@ -436,8 +436,8 @@ export function TaskDrawer({
       setTimeout(() => {
         onSave();
       }, 1000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to save task');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to save task'));
       setSaving(false);
     }
   };
@@ -449,8 +449,8 @@ export function TaskDrawer({
       await apiDelete(`/tasks/${task.id}`);
       window.dispatchEvent(new Event('projects-updated'));
       onSave();
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete task');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to delete task'));
     }
   };
 
@@ -464,8 +464,8 @@ export function TaskDrawer({
 
       setSubtasks([...subtasks, data.subtask]);
       setNewSubtaskTitle('');
-    } catch (err: any) {
-      setError(err.message || 'Failed to add subtask');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to add subtask'));
     }
   };
 
@@ -481,8 +481,8 @@ export function TaskDrawer({
       setSubtasks(
         subtasks.map((s) => (s.id === subtask.id ? data.subtask : s))
       );
-    } catch (err: any) {
-      setError(err.message || 'Failed to update subtask');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to update subtask'));
     }
   };
 
@@ -492,8 +492,8 @@ export function TaskDrawer({
     try {
       await apiDelete(`/tasks/${task.id}/subtasks/${subtaskId}`);
       setSubtasks(subtasks.filter((s) => s.id !== subtaskId));
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete subtask');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to delete subtask'));
     }
   };
 
@@ -524,8 +524,8 @@ export function TaskDrawer({
       setNewLinkUrl('');
       setNewLinkTitle('');
       setShowAddLink(false);
-    } catch (err: any) {
-      setLinkError(err.message || 'Failed to add link');
+    } catch (err: unknown) {
+      setLinkError(getErrorMessage(err, 'Failed to add link'));
     }
   };
 
@@ -534,8 +534,8 @@ export function TaskDrawer({
     try {
       await apiDelete(`/tasks/${task.id}/links/${linkId}`);
       setLinks(links.filter((l) => l.id !== linkId));
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete link');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to delete link'));
     }
   };
 

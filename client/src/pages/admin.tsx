@@ -3,13 +3,12 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '@/hooks/use-auth';
 import { User } from '@/types';
-import { apiPost, apiGet, apiPut, apiDelete } from '@/lib/api';
+import { apiPost, apiGet, apiPut, apiDelete, getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -116,8 +115,8 @@ export default function AdminPage() {
       // Refresh users list
       const usersResponse = await apiGet<{ users: User[] }>('/auth/users');
       setUsers(usersResponse.users);
-    } catch (err: any) {
-      setInviteError(err.message || 'Failed to invite user');
+    } catch (err: unknown) {
+      setInviteError(getErrorMessage(err, 'Failed to invite user'));
     } finally {
       setInviteLoading(false);
     }
@@ -142,8 +141,8 @@ export default function AdminPage() {
 
       // Refresh current user to reflect role change
       window.location.reload();
-    } catch (err: any) {
-      alert(err.message || 'Failed to transfer admin rights');
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Failed to transfer admin rights'));
     } finally {
       setTransferLoading(false);
       setTransferDialogOpen(false);
@@ -167,8 +166,8 @@ export default function AdminPage() {
       // Refresh users list
       const usersResponse = await apiGet<{ users: User[] }>('/auth/users');
       setUsers(usersResponse.users);
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete user');
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Failed to delete user'));
     } finally {
       setDeleteLoading(false);
       setDeleteDialogOpen(false);
@@ -189,8 +188,8 @@ export default function AdminPage() {
       const response = await apiPut<{ temporaryPassword: string }>(`/admin/users/${resetUserId}/reset-password`);
       setResetResult(response.temporaryPassword);
       // Don't close dialog — show the password
-    } catch (err: any) {
-      alert(err.message || 'Failed to reset password');
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Failed to reset password'));
       setResetDialogOpen(false);
     } finally {
       setResetLoading(false);
@@ -217,8 +216,8 @@ export default function AdminPage() {
       const usersResponse = await apiGet<{ users: User[] }>('/auth/users');
       setUsers(usersResponse.users);
       setEditDialogOpen(false);
-    } catch (err: any) {
-      setEditError(err.message || 'Failed to update user');
+    } catch (err: unknown) {
+      setEditError(getErrorMessage(err, 'Failed to update user'));
     } finally {
       setEditLoading(false);
     }
@@ -260,8 +259,8 @@ export default function AdminPage() {
       setTimeout(() => {
         setWorkspaceSuccess('');
       }, 3000);
-    } catch (err: any) {
-      setWorkspaceError(err.message || 'Failed to update workspace name');
+    } catch (err: unknown) {
+      setWorkspaceError(getErrorMessage(err, 'Failed to update workspace name'));
     } finally {
       setWorkspaceSaving(false);
     }

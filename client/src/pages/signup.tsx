@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { useAuth } from '@/hooks/use-auth';
-import { apiGet } from '@/lib/api';
+import { apiGet, ApiError, getErrorMessage } from '@/lib/api';
 import { PasswordGenerator } from '@/components/password-generator';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,11 +38,11 @@ export default function SignupPage() {
     try {
       await signup(email, password, displayName);
       navigate('/my-tasks');
-    } catch (err: any) {
-      if (err.status === 403) {
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 403) {
         setError('Registration is disabled. Contact your admin.');
       } else {
-        setError(err.message || 'Signup failed');
+        setError(getErrorMessage(err, 'Signup failed'));
       }
     } finally {
       setLoading(false);

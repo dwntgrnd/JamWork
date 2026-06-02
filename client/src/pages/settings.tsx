@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
+import { getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,7 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const { user, changePassword, updateProfile, updateNotificationPreferences } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
 
   const [notifyPrefs, setNotifyPrefs] = useState({
     notifyAssigned: user?.notifyAssigned ?? true,
@@ -53,9 +54,9 @@ export default function SettingsPage() {
     setNotifyError('');
     try {
       await updateNotificationPreferences(next);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setNotifyPrefs(previous); // revert on failure
-      setNotifyError(err.message || 'Failed to update notification preferences');
+      setNotifyError(getErrorMessage(err, 'Failed to update notification preferences'));
     }
   };
 
@@ -78,8 +79,8 @@ export default function SettingsPage() {
       await updateProfile(profileEmail, profileName);
       setProfileSuccess('Profile updated successfully');
       setTimeout(() => setProfileSuccess(''), 3000);
-    } catch (err: any) {
-      setProfileError(err.message || 'Failed to update profile');
+    } catch (err: unknown) {
+      setProfileError(getErrorMessage(err, 'Failed to update profile'));
     } finally {
       setProfileLoading(false);
     }
@@ -126,8 +127,8 @@ export default function SettingsPage() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err: any) {
-      setError(err.message || 'Failed to change password');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to change password'));
     } finally {
       setLoading(false);
     }

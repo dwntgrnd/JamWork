@@ -4,7 +4,7 @@
  * Uses CSS custom properties — no dark: variants needed.
  */
 
-import { TaskStatus, TaskPriority, TaskEffort } from '@/types';
+import { TaskStatus, TaskPriority } from '@/types';
 
 /**
  * Status chip color tokens (bold fill, rounded rectangle).

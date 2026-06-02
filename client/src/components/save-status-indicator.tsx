@@ -1,6 +1,5 @@
 
 import { Loader2, Check, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface SaveStatusIndicatorProps {
   status: 'idle' | 'saving' | 'saved' | 'error';

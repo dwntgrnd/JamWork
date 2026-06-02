@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { apiGet, apiPost, apiPut } from '@/lib/api';
+import { apiGet, apiPost, apiPut, getErrorMessage } from '@/lib/api';
 import { Sprint, Task, Project, UserSummary, STATUS_LABELS, PRIORITY_LABELS } from '@/types';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -40,16 +40,6 @@ const PRIORITY_ORDER: Record<string, number> = {
   medium: 2,
   low: 3,
 };
-
-function sortByPriorityDesc(tasks: Task[]): Task[] {
-  return [...tasks].sort((a, b) => {
-    const pa = PRIORITY_ORDER[a.priority] ?? 4;
-    const pb = PRIORITY_ORDER[b.priority] ?? 4;
-    if (pa !== pb) return pa - pb;
-    // Secondary sort: createdAt descending (newest first)
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
-}
 
 // Extended Sprint type with tasks and project relations
 interface SprintWithTasks extends Sprint {
@@ -238,8 +228,8 @@ export default function GlobalSprintsPage() {
       toast.success('Sprint closed successfully');
       fetchAllData();
       window.dispatchEvent(new Event('sprints-updated'));
-    } catch (err: any) {
-      setCloseError(err.message || 'Failed to close sprint');
+    } catch (err: unknown) {
+      setCloseError(getErrorMessage(err, 'Failed to close sprint'));
     } finally {
       setCloseLoading(false);
     }
@@ -284,8 +274,8 @@ export default function GlobalSprintsPage() {
       await fetchAllData();
       toast.success(`Sprint "${newSprintName.trim()}" created`);
       window.dispatchEvent(new Event('sprints-updated'));
-    } catch (err: any) {
-      setCreateError(err.message || 'Failed to create sprint');
+    } catch (err: unknown) {
+      setCreateError(getErrorMessage(err, 'Failed to create sprint'));
     }
   };
 
@@ -307,8 +297,8 @@ export default function GlobalSprintsPage() {
       setShowEditDialog(false);
       await fetchAllData();
       window.dispatchEvent(new Event('sprints-updated'));
-    } catch (err: any) {
-      setEditError(err.message || 'Failed to update sprint');
+    } catch (err: unknown) {
+      setEditError(getErrorMessage(err, 'Failed to update sprint'));
     }
   };
 
