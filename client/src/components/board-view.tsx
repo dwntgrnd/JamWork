@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiGet, apiPut } from '@/lib/api';
+import { invalidateProjects } from '@/hooks/use-projects';
 import { Task, TaskStatus, TaskFilterState } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
 import { BoardColumn } from '@/components/board-column';
@@ -141,7 +142,7 @@ export function BoardView({ projectId, filters, refreshKey }: BoardViewProps) {
           needsRefresh = true;
         }
         // Status changes alter a project's open-task count — refresh the sidebar badge.
-        window.dispatchEvent(new Event('projects-updated'));
+        invalidateProjects();
       }
 
       // Update sortOrder via reorder endpoint

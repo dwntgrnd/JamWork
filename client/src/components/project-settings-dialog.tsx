@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiPut } from '@/lib/api';
+import { invalidateProjects } from '@/hooks/use-projects';
 import { Project } from '@/types';
 import {
   Dialog,
@@ -74,7 +75,7 @@ export function ProjectSettingsDialog({
           defaultNotifyEnabled,
         }
       );
-      window.dispatchEvent(new Event('projects-updated'));
+      invalidateProjects();
       onSaved(updated);
       onOpenChange(false);
     } catch (err) {

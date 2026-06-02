@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '@/hooks/use-auth';
+import { setCachedWorkspaceName } from '@/hooks/use-workspace-name';
 import { User } from '@/types';
 import { apiPost, apiGet, apiPut, apiDelete, getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -250,10 +251,8 @@ export default function AdminPage() {
       setOriginalName(response.workspaceName);
       setWorkspaceName(response.workspaceName);
 
-      // Dispatch custom event for header to listen to
-      window.dispatchEvent(
-        new CustomEvent('workspace-name-updated', { detail: { name: response.workspaceName } })
-      );
+      // Update the cached workspace name so the header reflects it immediately.
+      setCachedWorkspaceName(response.workspaceName);
 
       // Clear success message after 3 seconds
       setTimeout(() => {

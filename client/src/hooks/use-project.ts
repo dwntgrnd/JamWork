@@ -1,40 +1,26 @@
-import { useCallback, useEffect, useState } from 'react';
-import { apiGet } from '@/lib/api';
+import { useCallback } from 'react';
 import { Project } from '@/types';
+import { useProjects, invalidateProjects, patchCachedProject } from '@/hooks/use-projects';
 
 /**
- * Fetches a single project (by id) and keeps it fresh.
+ * A single project (by id), derived from the shared projects query.
  *
- * Listens for the `projects-updated` window event — dispatched by task mutations
- * (create/delete/status change) and project edits — so derived values like the
- * open-task count (`_count.tasks`) stay current without a full page reload.
- *
- * `setProject` lets callers apply an optimistic update (e.g. after saving settings);
- * `refetch` forces a reload on demand.
+ * Kept as a thin adapter over {@link useProjects} so existing callers keep the
+ * `{ project, loading, setProject, refetch }` shape. `setProject` applies an
+ * optimistic cache update; `refetch` re-runs the projects query — both formerly
+ * coordinated via the `projects-updated` window event.
  */
 export function useProject(projectId?: string) {
-  const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: projects, isLoading } = useProjects();
+  const project = projects?.find((p) => p.id === projectId) ?? null;
 
-  const refetch = useCallback(async () => {
-    try {
-      const data = await apiGet<{ projects: Project[] }>('/projects');
-      const current = data.projects.find((p) => p.id === projectId);
-      if (current) setProject(current);
-    } catch (err) {
-      console.error('Failed to fetch project:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId]);
+  const setProject = useCallback((updated: Project) => {
+    patchCachedProject(updated);
+  }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    refetch();
-    const handler = () => refetch();
-    window.addEventListener('projects-updated', handler);
-    return () => window.removeEventListener('projects-updated', handler);
-  }, [refetch]);
+  const refetch = useCallback(() => {
+    invalidateProjects();
+  }, []);
 
-  return { project, loading, setProject, refetch };
+  return { project, loading: isLoading, setProject, refetch };
 }

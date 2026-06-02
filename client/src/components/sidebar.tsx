@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router';
-import { apiGet, apiPost, apiDelete, getErrorMessage } from '@/lib/api';
+import { apiPost, apiDelete, getErrorMessage } from '@/lib/api';
+import { useProjects, invalidateProjects } from '@/hooks/use-projects';
 import { Project } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,8 +55,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: projects = [], isLoading: loading } = useProjects();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
@@ -63,28 +63,6 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   const [newProjectEndDate, setNewProjectEndDate] = useState('');
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    fetchProjects();
-
-    const handleProjectsUpdated = () => fetchProjects();
-    window.addEventListener('projects-updated', handleProjectsUpdated);
-    return () => {
-      window.removeEventListener('projects-updated', handleProjectsUpdated);
-    };
-  }, []);
-
-  const fetchProjects = async () => {
-    try {
-      setLoading(true);
-      const data = await apiGet<{ projects: Project[] }>('/projects');
-      setProjects(data.projects);
-    } catch (err) {
-      console.error('Failed to fetch projects:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) {
@@ -106,7 +84,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
         endDate: newProjectEndDate || undefined,
       });
 
-      setProjects([...projects, data.project]);
+      invalidateProjects();
       setShowCreateDialog(false);
       setNewProjectName('');
       setNewProjectDescription('');
@@ -125,7 +103,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
 
     try {
       await apiDelete(`/projects/${deleteProjectId}`);
-      setProjects(projects.filter((p) => p.id !== deleteProjectId));
+      invalidateProjects();
       setDeleteProjectId(null);
     } catch (err) {
       console.error('Failed to delete project:', err);
