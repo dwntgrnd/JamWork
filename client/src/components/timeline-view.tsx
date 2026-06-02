@@ -1,42 +1,27 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, memo } from 'react';
-import { apiGet, apiPost, apiPut, apiDelete, getErrorMessage } from '@/lib/api';
-import { Task, Sprint, Milestone, Project, UserSummary, STATUS_LABELS, TaskFilterState, TaskStatus } from '@/types';
+import { apiPost, apiPut, apiDelete, getErrorMessage } from '@/lib/api';
+import { useAuth } from '@/hooks/use-auth';
+import { useTasks, invalidateTasks } from '@/hooks/use-tasks';
+import { useProjects } from '@/hooks/use-projects';
+import { useSprints } from '@/hooks/use-sprints';
+import { useMilestones, invalidateMilestones } from '@/hooks/use-milestones';
+import { Task, Milestone, Project, STATUS_LABELS, TaskFilterState } from '@/types';
 import { getPriorityDotColor } from '@/lib/style-tokens';
 import { parseLocalDate, startOfLocalDay } from '@/lib/date-utils';
-import { Button } from '@/components/ui/button';
 import { TaskDrawer } from '@/components/task-drawer';
+import { TimelineHeader } from '@/components/timeline-header';
+import { MilestoneDialog } from '@/components/milestone-dialog';
+import { TimelineTaskBar } from '@/components/timeline-task-bar';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Input } from '@/components/ui/input';
-import { Label as FormLabel } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, ChevronDown, Target, GanttChart, Diamond, Plus } from 'lucide-react';
+import { ChevronRight, ChevronDown, GanttChart, Diamond } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { isOverdue } from '@/lib/date-utils';
-import { toast } from 'sonner';
 
 type ZoomLevel = 'day' | 'week' | 'month';
 
@@ -62,12 +47,29 @@ const formatShortDate = (date: Date | string): string => {
 
 const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewProps) => {
   const isMobile = useIsMobile();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [sprints, setSprints] = useState<Sprint[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? null;
+
+  // Data comes from TanStack Query — sprints & milestones are global roadmap/cycle
+  // markers (every project sees the same set); only tasks are project-scoped. This
+  // replaced the old fetchData Promise.all + window refreshKey churn.
+  const tasksQuery = useTasks({ projectId });
+  const refetchTasks = tasksQuery.refetch;
+  const projectsQuery = useProjects();
+  const sprintsQuery = useSprints();
+  const milestonesQuery = useMilestones();
+
+  // Only tasks with a start or due date land on the timeline.
+  const tasks = (tasksQuery.data ?? []).filter((t) => t.dueDate || t.startDate);
+  const projects = projectsQuery.data ?? [];
+  const sprints = sprintsQuery.data ?? [];
+  const milestones = milestonesQuery.data ?? [];
+  const loading =
+    tasksQuery.isLoading ||
+    projectsQuery.isLoading ||
+    sprintsQuery.isLoading ||
+    milestonesQuery.isLoading;
+
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('week');
   const [dateOffset, setDateOffset] = useState(0);
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -99,46 +101,17 @@ const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewP
     });
   };
 
+  // projectId changes refetch automatically (it's part of the query key). The parent
+  // bumps refreshKey after creating a task from the header — refetch tasks on change,
+  // skipping the initial render.
+  const firstRefresh = useRef(true);
   useEffect(() => {
-    fetchData();
-  }, [projectId, refreshKey]);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-
-      // Build query params based on whether projectId is provided
-      const projectQuery = projectId ? `?projectId=${projectId}` : '';
-
-      // Fetch all data in parallel
-      // Note: sprints and milestones are global — they represent shared resource
-      // cycles and organizational roadmap markers, and every project sees the same
-      // set. Only tasks are project-scoped.
-      const [tasksData, milestonesData, sprintsData, currentUserData, projectsData] = await Promise.all([
-        apiGet<{ tasks: Task[] }>(`/tasks${projectQuery}`),
-        apiGet<{ milestones: Milestone[] }>('/milestones'),
-        apiGet<{ sprints: Sprint[] }>('/sprints'),
-        apiGet<{ user: UserSummary }>('/auth/me'),
-        apiGet<{ projects: Project[] }>('/projects'),
-      ]);
-
-      // Filter tasks that have at least a due date or start date
-      const tasksWithDates = tasksData.tasks.filter(
-        (task) => task.dueDate || task.startDate
-      );
-
-      setTasks(tasksWithDates);
-      setProjects(projectsData.projects);
-      setMilestones(milestonesData.milestones);
-      setSprints(sprintsData.sprints);
-      setCurrentUserId(currentUserData.user.id);
-    } catch (err) {
-      console.error('Failed to fetch timeline data:', err);
-      toast.error('Failed to load timeline data');
-    } finally {
-      setLoading(false);
+    if (firstRefresh.current) {
+      firstRefresh.current = false;
+      return;
     }
-  };
+    refetchTasks();
+  }, [refreshKey, refetchTasks]);
 
   // Milestone CRUD handlers
   const handleOpenCreateMilestone = () => {
@@ -192,7 +165,7 @@ const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewP
       }
 
       setShowMilestoneDialog(false);
-      fetchData(); // Refresh all data including milestones
+      invalidateMilestones();
     } catch (err: unknown) {
       setMilestoneError(getErrorMessage(err, 'Failed to save milestone'));
     }
@@ -204,7 +177,7 @@ const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewP
     try {
       await apiDelete(`/milestones/${deleteMilestoneId}`);
       setDeleteMilestoneId(null);
-      fetchData(); // Refresh all data including milestones
+      invalidateMilestones();
     } catch (err) {
       console.error('Failed to delete milestone:', err);
     }
@@ -444,24 +417,6 @@ const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewP
   const isTodayVisible =
     today >= adjustedStart && today <= adjustedEnd;
 
-  // Status colors for timeline bars (uses CSS variable tokens)
-  const getStatusColor = (status: TaskStatus) => {
-    switch (status) {
-      case 'todo':
-        return 'bg-status-todo-bg';
-      case 'in_progress':
-        return 'bg-status-in_progress-bg';
-      case 'blocked':
-        return 'bg-status-blocked-bg';
-      case 'review':
-        return 'bg-status-review-bg';
-      case 'done':
-        return 'bg-status-done-bg';
-      default:
-        return 'bg-status-todo-bg';
-    }
-  };
-
   // Handle date navigation
   const handleNavigateLeft = () => {
     setDateOffset((prev) => prev - 1);
@@ -625,60 +580,14 @@ const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewP
     <TooltipProvider>
       <div className="space-y-4">
         {/* Toolbar */}
-        <div className="flex items-center gap-4 p-4 bg-card border rounded-lg">
-          {/* Time-scale controls */}
-          <div className="flex items-center rounded-md border bg-muted p-0.5">
-            {(['day', 'week', 'month'] as ZoomLevel[]).map((level) => (
-              <button
-                key={level}
-                onClick={() => setZoomLevel(level)}
-                className={cn(
-                  'px-3 py-1 text-sm font-medium rounded-sm transition-colors',
-                  zoomLevel === level
-                    ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {level === 'day' ? 'Day' : level === 'week' ? 'Week' : 'Month'}
-              </button>
-            ))}
-          </div>
-
-          {/* Date navigation */}
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleNavigateLeft}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleToday}>
-              <Target className="h-4 w-4 mr-1" />
-              Today
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleNavigateRight}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Add Milestone button */}
-          <Button variant="outline" size="sm" onClick={handleOpenCreateMilestone}>
-            <Plus className="h-4 w-4 mr-1" />
-            Milestone
-          </Button>
-
-          {/* Status legend */}
-          <div className="flex items-center gap-3 ml-auto">
-            {[
-              { label: 'To Do', color: 'bg-status-todo-bg' },
-              { label: 'In Progress', color: 'bg-status-in_progress-bg' },
-              { label: 'Review', color: 'bg-status-review-bg' },
-              { label: 'Done', color: 'bg-status-done-bg' },
-            ].map(item => (
-              <div key={item.label} className="flex items-center gap-1">
-                <div className={cn('w-3 h-2 rounded-sm', item.color)} />
-                <span className="text-xs text-muted-foreground">{item.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <TimelineHeader
+          zoomLevel={zoomLevel}
+          onZoomChange={setZoomLevel}
+          onNavigateLeft={handleNavigateLeft}
+          onNavigateRight={handleNavigateRight}
+          onToday={handleToday}
+          onCreateMilestone={handleOpenCreateMilestone}
+        />
 
         {/* Timeline */}
         <div className="border rounded-lg bg-card overflow-hidden">
@@ -990,155 +899,11 @@ const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewP
                       ))}
 
                       {/* Task bar or point */}
-                      {task.startDate && task.dueDate ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div
-                              className={cn(
-                                'absolute top-[6px] h-6 rounded-md cursor-pointer hover:shadow-md transition-shadow z-10',
-                                getStatusColor(task.status),
-                                isOverdue(task.dueDate, task.status) && 'ring-2 ring-destructive/50',
-                                task.status === 'blocked' && !isOverdue(task.dueDate, task.status) && 'ring-2 ring-status-blocked-fg/60',
-                                task.status === 'done' && 'opacity-60'
-                              )}
-                              style={{
-                                left: getDatePosition(task.startDate),
-                                width:
-                                  getDatePosition(task.dueDate) -
-                                  getDatePosition(task.startDate),
-                                ...(isOverdue(task.dueDate, task.status) && {
-                                  backgroundImage: 'var(--overdue-hatch)'
-                                })
-                              }}
-                              role="button"
-                              tabIndex={0}
-                              aria-label={task.title}
-                              onClick={() => setEditTask(task)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  setEditTask(task);
-                                }
-                              }}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-xs">
-                              <div className="font-semibold">{task.title}</div>
-                              <div className="text-muted-foreground">
-                                {new Date(task.startDate).toLocaleDateString()} -{' '}
-                                {new Date(task.dueDate).toLocaleDateString()}
-                              </div>
-                              <div className="text-muted-foreground">
-                                Status: {task.status} | Priority: {task.priority}
-                              </div>
-                              {task.assignees && task.assignees.length > 0 && (
-                                <div className="text-muted-foreground">
-                                  Assigned to:{' '}
-                                  {task.assignees
-                                    .map((a) => a.user?.displayName)
-                                    .join(', ')}
-                                </div>
-                              )}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : task.dueDate ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div
-                              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 cursor-pointer z-10"
-                              style={{ left: getDatePosition(task.dueDate) }}
-                              role="button"
-                              tabIndex={0}
-                              aria-label={task.title}
-                              onClick={() => setEditTask(task)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  setEditTask(task);
-                                }
-                              }}
-                            >
-                              <div
-                                className={cn(
-                                  'w-3 h-3 rounded-full border-2 border-white shadow-md',
-                                  getStatusColor(task.status),
-                                  isOverdue(task.dueDate, task.status) && 'ring-2 ring-destructive/50',
-                                  task.status === 'blocked' && !isOverdue(task.dueDate, task.status) && 'ring-2 ring-status-blocked-fg/60',
-                                  task.status === 'done' && 'opacity-60'
-                                )}
-                              />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-xs">
-                              <div className="font-semibold">{task.title}</div>
-                              <div className="text-muted-foreground">
-                                Due: {new Date(task.dueDate).toLocaleDateString()}
-                              </div>
-                              <div className="text-muted-foreground">
-                                Status: {task.status} | Priority: {task.priority}
-                              </div>
-                              {task.assignees && task.assignees.length > 0 && (
-                                <div className="text-muted-foreground">
-                                  Assigned to:{' '}
-                                  {task.assignees
-                                    .map((a) => a.user?.displayName)
-                                    .join(', ')}
-                                </div>
-                              )}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : task.startDate ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div
-                              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 cursor-pointer z-10"
-                              style={{ left: getDatePosition(task.startDate) }}
-                              role="button"
-                              tabIndex={0}
-                              aria-label={task.title}
-                              onClick={() => setEditTask(task)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  setEditTask(task);
-                                }
-                              }}
-                            >
-                              <div
-                                className={cn(
-                                  'w-3 h-3 rounded-full border-2 border-white shadow-md',
-                                  getStatusColor(task.status),
-                                  task.status === 'blocked' && 'ring-2 ring-status-blocked-fg/60',
-                                  task.status === 'done' && 'opacity-60'
-                                )}
-                              />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-xs">
-                              <div className="font-semibold">{task.title}</div>
-                              <div className="text-muted-foreground">
-                                Start: {new Date(task.startDate).toLocaleDateString()}
-                              </div>
-                              <div className="text-muted-foreground">
-                                Status: {task.status} | Priority: {task.priority}
-                              </div>
-                              {task.assignees && task.assignees.length > 0 && (
-                                <div className="text-muted-foreground">
-                                  Assigned to:{' '}
-                                  {task.assignees
-                                    .map((a) => a.user?.displayName)
-                                    .join(', ')}
-                                </div>
-                              )}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : null}
+                      <TimelineTaskBar
+                        task={task}
+                        getDatePosition={getDatePosition}
+                        onEdit={setEditTask}
+                      />
                     </div>
                   );
                 })}
@@ -1153,103 +918,31 @@ const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewP
         <TaskDrawer
           mode="edit"
           task={editTask}
-          onSave={fetchData}
+          onSave={() => invalidateTasks()}
           onClose={() => {
-            fetchData();
+            invalidateTasks();
             setEditTask(null);
           }}
         />
       )}
 
-      {/* Create/Edit Milestone Dialog */}
-      <Dialog open={showMilestoneDialog} onOpenChange={setShowMilestoneDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingMilestone ? 'Edit Milestone' : 'Create Milestone'}
-            </DialogTitle>
-            <DialogDescription>
-              {editingMilestone
-                ? 'Update the milestone details.'
-                : 'Add a new milestone to mark an important date on the timeline.'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <FormLabel htmlFor="milestone-name">
-                Name <span className="text-destructive">*</span>
-              </FormLabel>
-              <Input
-                id="milestone-name"
-                value={milestoneForm.name}
-                onChange={(e) =>
-                  setMilestoneForm({ ...milestoneForm, name: e.target.value })
-                }
-                placeholder="Milestone name"
-                maxLength={100}
-                autoFocus
-              />
-            </div>
-
-            <div>
-              <FormLabel htmlFor="milestone-date">
-                Date <span className="text-destructive">*</span>
-              </FormLabel>
-              <Input
-                id="milestone-date"
-                type="date"
-                value={milestoneForm.date}
-                onChange={(e) =>
-                  setMilestoneForm({ ...milestoneForm, date: e.target.value })
-                }
-              />
-            </div>
-
-            {milestoneError && <p className="text-sm text-destructive">{milestoneError}</p>}
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowMilestoneDialog(false);
-                setMilestoneError('');
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSaveMilestone}>
-              {editingMilestone ? 'Save Changes' : 'Create Milestone'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Milestone Confirmation */}
-      <AlertDialog
-        open={!!deleteMilestoneId}
-        onOpenChange={() => setDeleteMilestoneId(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Milestone?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this milestone. This action cannot be
-              undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteMilestone}
-              className="bg-destructive hover:bg-destructive/90 text-white"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Create/Edit + Delete Milestone dialogs */}
+      <MilestoneDialog
+        open={showMilestoneDialog}
+        onOpenChange={setShowMilestoneDialog}
+        isEditing={!!editingMilestone}
+        form={milestoneForm}
+        onFormChange={setMilestoneForm}
+        error={milestoneError}
+        onCancel={() => {
+          setShowMilestoneDialog(false);
+          setMilestoneError('');
+        }}
+        onSave={handleSaveMilestone}
+        deleteOpen={!!deleteMilestoneId}
+        onDeleteOpenChange={() => setDeleteMilestoneId(null)}
+        onConfirmDelete={handleDeleteMilestone}
+      />
     </TooltipProvider>
   );
 };
