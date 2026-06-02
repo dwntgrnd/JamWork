@@ -36,6 +36,11 @@ interface TaskListProps {
   onSelectionChange?: (selectedIds: Set<string>, selectedTasks: Task[]) => void;
 }
 
+// Stable empty default so `tasks` keeps a constant reference while the query is
+// loading (data === undefined). A fresh [] each render would make the
+// selection-sync effect below re-run every render and loop with the parent.
+const EMPTY_TASKS: Task[] = [];
+
 export function TaskList({
   projectId,
   assigneeId,
@@ -58,7 +63,7 @@ export function TaskList({
     sortBy: filters.sortBy,
     sortDir: filters.sortDir,
   };
-  const { data: tasks = [], isLoading: loading, refetch } = useTasks(taskParams);
+  const { data: tasks = EMPTY_TASKS, isLoading: loading, refetch } = useTasks(taskParams);
   const { data: users = [] } = useUsers();
   const { data: projects = [] } = useProjects();
 
