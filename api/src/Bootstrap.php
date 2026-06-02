@@ -1,0 +1,73 @@
+<?php
+
+namespace JamWork;
+
+use JamWork\Middleware\NoCacheMiddleware;
+use JamWork\Middleware\RateLimitMiddleware;
+use JamWork\Routes\AdminRoutes;
+use JamWork\Routes\AuthRoutes;
+use JamWork\Routes\WorkspaceSettingsRoutes;
+use JamWork\Routes\ProjectRoutes;
+use JamWork\Routes\LabelRoutes;
+use JamWork\Routes\MilestoneRoutes;
+use JamWork\Routes\TaskLinkRoutes;
+use JamWork\Routes\SprintRoutes;
+use JamWork\Routes\TaskRoutes;
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Slim\App;
+use Slim\Factory\AppFactory;
+
+class Bootstrap
+{
+    /**
+     * Build the fully-configured Slim app (middleware stack, JSON error
+     * handler, and all route groups) without running it. index.php calls
+     * ->run() on the result; the integration test harness calls ->handle().
+     *
+     * Assumes environment variables are already loaded into $_ENV.
+     */
+    public static function createApp(): App
+    {
+        $app = AppFactory::create();
+        $app->setBasePath('/api');
+
+        // Middleware stack (executes bottom-to-top)
+        $app->add(new NoCacheMiddleware());
+        $app->addBodyParsingMiddleware();
+        $app->add(RateLimitMiddleware::generalLimiter());
+        $app->addRoutingMiddleware();
+
+        // Error middleware — always return JSON
+        $errorMiddleware = $app->addErrorMiddleware(
+            $_ENV['APP_ENV'] === 'development',
+            true,
+            true
+        );
+
+        $errorHandler = $errorMiddleware->getDefaultErrorHandler();
+        $errorHandler->forceContentType('application/json');
+
+        // Routes
+        $app->get('/health', function (Request $request, Response $response) {
+            $payload = json_encode([
+                'status' => 'ok',
+                'timestamp' => round(microtime(true) * 1000),
+            ]);
+            $response->getBody()->write($payload);
+            return $response->withHeader('Content-Type', 'application/json');
+        });
+
+        AuthRoutes::register($app);
+        AdminRoutes::register($app);
+        WorkspaceSettingsRoutes::register($app);
+        ProjectRoutes::register($app);
+        LabelRoutes::register($app);
+        MilestoneRoutes::register($app);
+        TaskLinkRoutes::register($app);
+        SprintRoutes::register($app);
+        TaskRoutes::register($app);
+
+        return $app;
+    }
+}

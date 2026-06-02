@@ -13,6 +13,28 @@ jobs:
     defaults:
       run:
         working-directory: api
+    services:
+      # Integration tests boot the real app against a real MySQL schema.
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: jamwork_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_NAME: jamwork_test
+      DB_USER: root
+      DB_PASS: root
+      JWT_SECRET: integration-test-secret-key-0123456789abcd
+      APP_ENV: testing
     steps:
       - uses: actions/checkout@v4
 
@@ -21,6 +43,7 @@ jobs:
         with:
           php-version: '8.2'
           tools: composer
+          extensions: pdo_mysql
 
       - name: Validate composer files
         run: composer validate
