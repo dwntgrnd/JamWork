@@ -237,7 +237,7 @@ class AuthRoutes
                     throw $e;
                 }
 
-                $response = Auth::setAuthCookie($response, $userId, 'admin');
+                $response = Auth::setAuthCookie($response, $userId, 'admin', 0);
                 $response->getBody()->write(json_encode([
                     'user' => [
                         'id' => $userId,
@@ -295,7 +295,7 @@ class AuthRoutes
                     return $invalidCredentials();
                 }
 
-                $response = Auth::setAuthCookie($response, $user['id'], $user['role']);
+                $response = Auth::setAuthCookie($response, $user['id'], $user['role'], (int) $user['token_version']);
                 $response->getBody()->write(json_encode([
                     'user' => [
                         'id' => $user['id'],

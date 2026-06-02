@@ -862,6 +862,7 @@ ENV;
             __DIR__ . '/migrations/002_password_reset_tokens.sql',
             __DIR__ . '/migrations/003_project_sprint_planning.sql',
             __DIR__ . '/migrations/004_notification_preferences.sql',
+            __DIR__ . '/migrations/005_add_token_version.sql',
         ];
 
         foreach ($migrations as $file) {

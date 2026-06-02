@@ -71,5 +71,22 @@ check('S4: proxy on but empty XFF → REMOTE_ADDR',
 check('S4: proxy on, null XFF → REMOTE_ADDR',
     RateLimitMiddleware::resolveClientIp($server, null, true) === '10.0.0.5');
 
+echo "S3 — token_version matching & claim\n";
+
+check('S3: equal versions match',
+    Auth::tokenVersionMatches(3, 3) === true);
+check('S3: unequal versions do not match',
+    Auth::tokenVersionMatches(2, 3) === false);
+check('S3: missing claim (null) is treated as 0 and matches default',
+    Auth::tokenVersionMatches(null, 0) === true);
+check('S3: missing claim (null) does not match a bumped version',
+    Auth::tokenVersionMatches(null, 1) === false);
+
+// Round-trip: generateToken embeds tv; decodeToken returns it.
+$token = Auth::generateToken('user-1', 'member', 4);
+$decoded = Auth::decodeToken($token);
+check('S3: generated token carries tv claim',
+    is_array($decoded) && (int) ($decoded['tv'] ?? -1) === 4);
+
 echo "\n{$tests} checks, {$failures} failure(s)\n";
 exit($failures === 0 ? 0 : 1);

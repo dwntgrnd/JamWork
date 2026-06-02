@@ -18,7 +18,7 @@ class Auth
      */
     public const DUMMY_PASSWORD_HASH = '$2y$12$ckGpi7FjNYZxp/wqFPZP1e3r9P.2MkUjLtD0q2e0YAIjaaJQDfPWq';
 
-    public static function generateToken(string $userId, string $role): string
+    public static function generateToken(string $userId, string $role, int $tokenVersion = 0): string
     {
         $secret = $_ENV['JWT_SECRET'];
         $expiry = self::parseExpiry($_ENV['JWT_EXPIRY'] ?? '30d');
@@ -26,6 +26,7 @@ class Auth
         $payload = [
             'userId' => $userId,
             'role' => $role,
+            'tv' => $tokenVersion,
             'iat' => time(),
             'exp' => time() + $expiry,
         ];
@@ -44,9 +45,9 @@ class Auth
         }
     }
 
-    public static function setAuthCookie(Response $response, string $userId, string $role): Response
+    public static function setAuthCookie(Response $response, string $userId, string $role, int $tokenVersion = 0): Response
     {
-        $token = self::generateToken($userId, $role);
+        $token = self::generateToken($userId, $role, $tokenVersion);
         $secure = ($_ENV['APP_ENV'] ?? 'production') === 'production' ? '; Secure' : '';
         $expires = gmdate('D, d M Y H:i:s T', time() + self::COOKIE_MAX_AGE);
 
@@ -84,6 +85,16 @@ class Auth
     public static function verifyPassword(string $password, string $hash): bool
     {
         return password_verify($password, $hash);
+    }
+
+    /**
+     * S3: a token is valid only if its version claim matches the user's current
+     * token_version. A missing claim (tokens issued before the upgrade) is read
+     * as 0, which equals the column default — so the upgrade logs nobody out.
+     */
+    public static function tokenVersionMatches(mixed $claimTokenVersion, int $dbTokenVersion): bool
+    {
+        return (int) ($claimTokenVersion ?? 0) === $dbTokenVersion;
     }
 
     private static function parseExpiry(string $expiry): int
