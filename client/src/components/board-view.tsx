@@ -1,7 +1,9 @@
 
-import { useEffect, useState } from 'react';
-import { apiGet, apiPut } from '@/lib/api';
+import { useEffect, useRef, useState } from 'react';
+import { apiPut } from '@/lib/api';
 import { invalidateProjects } from '@/hooks/use-projects';
+import { useTasks, tasksKey } from '@/hooks/use-tasks';
+import { queryClient } from '@/lib/query-client';
 import { Task, TaskStatus, TaskFilterState } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
 import { BoardColumn } from '@/components/board-column';
@@ -20,8 +22,7 @@ interface BoardViewProps {
 export function BoardView({ projectId, filters, refreshKey }: BoardViewProps) {
   const isMobile = useIsMobile();
   const { user } = useAuth();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: tasks = [], isLoading: loading, isError, refetch } = useTasks({ projectId });
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [createStatus, setCreateStatus] = useState<TaskStatus | null>(null);
   const [collapsedColumns, setCollapsedColumns] = useState<Record<string, boolean>>({});
@@ -30,22 +31,27 @@ export function BoardView({ projectId, filters, refreshKey }: BoardViewProps) {
     setCollapsedColumns((prev) => ({ ...prev, [status]: !prev[status] }));
   };
 
+  // Surface load failures the way the old fetch did.
   useEffect(() => {
-    fetchTasks();
-  }, [projectId, refreshKey]);
+    if (isError) toast.error('Failed to load tasks');
+  }, [isError]);
 
-  const fetchTasks = async () => {
-    try {
-      setLoading(true);
-      const data = await apiGet<{ tasks: Task[] }>(`/tasks?projectId=${projectId}`);
-      setTasks(data.tasks);
-    } catch (err) {
-      console.error('Failed to fetch tasks:', err);
-      toast.error('Failed to load tasks');
-    } finally {
-      setLoading(false);
+  // The parent bumps refreshKey after creating a task from the header — refetch on change
+  // (skip the initial render, which the query already covers).
+  const firstRefresh = useRef(true);
+  useEffect(() => {
+    if (firstRefresh.current) {
+      firstRefresh.current = false;
+      return;
     }
+    refetch();
+  }, [refreshKey, refetch]);
+
+  // Optimistically rewrite the cached task list for this board.
+  const setTasks = (next: Task[]) => {
+    queryClient.setQueryData(tasksKey({ projectId }), next);
   };
+  const fetchTasks = () => refetch();
 
   // Filter tasks using filters prop
   const filteredTasks = tasks.filter((task) => {

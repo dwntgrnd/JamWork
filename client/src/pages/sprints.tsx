@@ -2,19 +2,8 @@
 import { useEffect, useState } from 'react';
 import { apiGet, apiPost, apiPut, getErrorMessage } from '@/lib/api';
 import { Sprint, Task, Project, UserSummary, STATUS_LABELS, PRIORITY_LABELS } from '@/types';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -22,14 +11,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Calendar, Check, ChevronDown, ChevronRight, ArrowRight, Archive, Plus, Pencil, X, ArrowUp, ArrowDown } from 'lucide-react';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Calendar, Archive, Plus, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getStatusPillClasses, formatStatusLabel, getPriorityDotColor } from '@/lib/style-tokens';
-import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { TaskDrawer } from '@/components/task-drawer';
+import { SprintCard } from '@/components/sprint-card';
+import {
+  CreateSprintDialog,
+  EditSprintDialog,
+  CloseSprintDialog,
+} from '@/components/sprint-dialogs';
 
 import { getAvatarColor } from '@/lib/style-tokens';
 
@@ -297,27 +290,9 @@ export default function GlobalSprintsPage() {
     }
   };
 
-  const formatDateRange = (startDate: Date | string, endDate: Date | string): string => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-  };
-
   const formatDate = (date: Date | string): string => {
     const d = new Date(date);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  // Group tasks by project
-  const groupTasksByProject = (tasks: (Task & { project?: { id: string; name: string } })[]) => {
-    const groups: Record<string, { projectName: string; tasks: Task[] }> = {};
-    for (const task of tasks) {
-      const pid = task.project?.id || 'unknown';
-      const pname = task.project?.name || 'Unknown Project';
-      if (!groups[pid]) groups[pid] = { projectName: pname, tasks: [] };
-      groups[pid].tasks.push(task);
-    }
-    return Object.values(groups);
   };
 
   // Separate active and completed sprints
@@ -466,206 +441,21 @@ export default function GlobalSprintsPage() {
               ) : (
                 <>
                   {/* Active Sprint Cards */}
-                  {activeSprints.map((sprint) => {
-                    const isExpanded = expandedSprintIds.has(sprint.id);
-                    const totalTasks = sprint.stats?.taskCount ?? sprint._count?.tasks ?? sprint.tasks?.length ?? 0;
-                    const completedTasks = sprint.stats?.completedCount ?? sprint.tasks?.filter((t) => t.status === 'done').length ?? 0;
-                    const projectGroups = sprint.tasks ? groupTasksByProject(sprint.tasks) : [];
-                    const otherActiveSprints = activeSprints.filter((s) => s.id !== sprint.id);
-
-                    return (
-                      <Card key={sprint.id} className="px-3 py-2.5 group">
-                    <div
-                      className="flex items-start gap-2 cursor-pointer select-none"
-                      onClick={() => toggleSprintExpanded(sprint.id)}
-                    >
-                      {/* Chevron */}
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        {/* Line 1: name + badge + project + edit icon */}
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm text-foreground truncate">
-                            {sprint.name}
-                          </span>
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-interactive/15 text-interactive-foreground font-medium whitespace-nowrap flex-shrink-0">
-                            Active
-                          </span>
-                          {sprint.project && (
-                            <span className="text-xs text-muted-foreground truncate flex-shrink-0">
-                              {sprint.project.name}
-                            </span>
-                          )}
-                          <button
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted flex-shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEditDialog(sprint);
-                            }}
-                            aria-label={`Edit ${sprint.name}`}
-                          >
-                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                          </button>
-                          <button
-                            className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-success/10 text-success hover:bg-success/20 flex-shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenCloseDialog(sprint);
-                            }}
-                            aria-label={`Close ${sprint.name}`}
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                            Close
-                          </button>
-                        </div>
-                        {/* Line 2: dates + count + progress */}
-                        <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
-                          <Calendar className="h-3 w-3 flex-shrink-0" />
-                          <span>{formatDateRange(sprint.startDate, sprint.endDate)}</span>
-                          <span>&middot;</span>
-                          <span>{totalTasks} {totalTasks === 1 ? 'task' : 'tasks'}</span>
-                          <span>&middot;</span>
-                          <span>{completedTasks} of {totalTasks} complete</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Expanded Task View */}
-                    {isExpanded && (
-                      <div className="mt-3 ml-6">
-                        {sprint.description && (
-                          <p className="text-sm text-muted-foreground mb-3 leading-relaxed">
-                            {sprint.description}
-                          </p>
-                        )}
-                        {projectGroups.length === 0 ? (
-                          <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
-                            <span>No tasks in this sprint</span>
-                            <span>&middot;</span>
-                            <button
-                              className="text-primary hover:underline font-medium"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenTaskDrawer(sprint.id);
-                              }}
-                            >
-                              Add task
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                          <div className="space-y-4">
-                          {projectGroups.map((group) => (
-                            <div key={group.projectName} className="space-y-2">
-                              <h5 className="text-sm font-medium text-foreground">
-                                {group.projectName} ({group.tasks.length} {group.tasks.length === 1 ? 'task' : 'tasks'})
-                              </h5>
-                              <div className="border rounded-md divide-y bg-card">
-                                {group.tasks.map((task) => (
-                                  <div
-                                    key={task.id}
-                                    className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/50 transition-colors cursor-pointer"
-                                    onClick={() => setEditingTask(task)}
-                                  >
-                                    <span
-                                      className={cn(
-                                        'w-2 h-2 rounded-full flex-shrink-0',
-                                        task.priority === 'urgent' && 'bg-priority-urgent',
-                                        task.priority === 'high' && 'bg-priority-high',
-                                        task.priority === 'medium' && 'bg-priority-medium',
-                                        task.priority === 'low' && 'bg-priority-low'
-                                      )}
-                                    />
-                                    <span className="flex-1 truncate text-foreground" title={task.title}>
-                                      {task.title}
-                                    </span>
-                                    {task.assignees && task.assignees.length > 0 && (
-                                      <div className="flex -space-x-1.5 shrink-0">
-                                        {task.assignees.slice(0, 3).map((assignee) => (
-                                          <div
-                                            key={assignee.id}
-                                            className={cn(
-                                              'h-6 w-6 rounded-full text-white text-[10px] font-medium flex items-center justify-center border-2 border-background ring-1 ring-border/50',
-                                              getAvatarColor(assignee.id || assignee.userId)
-                                            )}
-                                            title={assignee.user?.displayName}
-                                          >
-                                            {assignee.user?.displayName?.[0]?.toUpperCase() || '?'}
-                                          </div>
-                                        ))}
-                                        {task.assignees.length > 3 && (
-                                          <div className="h-6 w-6 rounded-full bg-muted text-muted-foreground text-[10px] font-medium flex items-center justify-center border-2 border-background">
-                                            +{task.assignees.length - 3}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                    <span className={cn(getStatusPillClasses(task.status), 'shrink-0')}>
-                                      {formatStatusLabel(task.status)}
-                                    </span>
-                                    {task.dueDate && (
-                                      <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 whitespace-nowrap">
-                                        <Calendar className="h-3 w-3" />
-                                        {formatDate(task.dueDate)}
-                                      </span>
-                                    )}
-                                    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                                    <Select
-                                      value={undefined}
-                                      onValueChange={(value) => {
-                                        if (value === '__backlog__') {
-                                          handleMoveTask(task.id, null);
-                                        } else {
-                                          const targetSprint = otherActiveSprints.find((s) => s.id === value);
-                                          handleMoveTask(task.id, value, targetSprint?.name);
-                                        }
-                                      }}
-                                    >
-                                      <SelectTrigger className="h-7 w-36 text-xs shrink-0">
-                                        <SelectValue placeholder="Move to..." />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="__backlog__">
-                                          <span className="flex items-center gap-1">
-                                            <ArrowRight className="h-3 w-3" /> Backlog
-                                          </span>
-                                        </SelectItem>
-                                        {otherActiveSprints.map((s) => (
-                                          <SelectItem key={s.id} value={s.id}>
-                                            <span className="flex items-center gap-1">
-                                              <ArrowRight className="h-3 w-3" /> {s.name}
-                                            </span>
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                          </div>
-                          <button
-                            className="flex items-center gap-1.5 mt-3 text-sm text-muted-foreground hover:text-primary transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenTaskDrawer(sprint.id);
-                            }}
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                            Add task
-                          </button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </Card>
-                );
-              })}
+                  {activeSprints.map((sprint) => (
+                    <SprintCard
+                      key={sprint.id}
+                      sprint={sprint}
+                      isActive
+                      isExpanded={expandedSprintIds.has(sprint.id)}
+                      moveTargets={activeSprints.filter((s) => s.id !== sprint.id)}
+                      onToggleExpand={toggleSprintExpanded}
+                      onEdit={handleOpenEditDialog}
+                      onClose={handleOpenCloseDialog}
+                      onAddTask={handleOpenTaskDrawer}
+                      onMoveTask={handleMoveTask}
+                      onTaskClick={setEditingTask}
+                    />
+                  ))}
 
               {/* Completed Sprints - if any */}
               {completedSprints.length > 0 && (
@@ -673,168 +463,19 @@ export default function GlobalSprintsPage() {
                   <div className="pt-6 mt-6 border-t border-border">
                     <h4 className="text-sm font-medium text-muted-foreground mb-3">Completed</h4>
                   </div>
-                  {completedSprints.map((sprint) => {
-                    const isExpanded = expandedSprintIds.has(sprint.id);
-                    const totalTasks = sprint.stats?.taskCount ?? sprint._count?.tasks ?? sprint.tasks?.length ?? 0;
-                    const projectGroups = sprint.tasks ? groupTasksByProject(sprint.tasks) : [];
-                    const otherActiveSprints = activeSprints.filter((s) => s.id !== sprint.id);
-
-                    return (
-                      <Card key={sprint.id} className="px-3 py-2.5 opacity-75 hover:opacity-100 transition-opacity group">
-                    <div
-                      className="flex items-start gap-2 cursor-pointer select-none"
-                      onClick={() => toggleSprintExpanded(sprint.id)}
-                    >
-                      {/* Chevron */}
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        {/* Line 1: name + badge + project + edit icon */}
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm text-foreground truncate">
-                            {sprint.name}
-                          </span>
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium whitespace-nowrap flex-shrink-0">
-                            Completed
-                          </span>
-                          {sprint.project && (
-                            <span className="text-xs text-muted-foreground truncate flex-shrink-0">
-                              {sprint.project.name}
-                            </span>
-                          )}
-                          <button
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted flex-shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEditDialog(sprint);
-                            }}
-                            aria-label={`Edit ${sprint.name}`}
-                          >
-                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                          </button>
-                        </div>
-                        {/* Line 2: dates + count */}
-                        <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
-                          <Calendar className="h-3 w-3 flex-shrink-0" />
-                          <span>{formatDateRange(sprint.startDate, sprint.endDate)}</span>
-                          <span>&middot;</span>
-                          <span>{totalTasks} {totalTasks === 1 ? 'task' : 'tasks'}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Expanded Task View */}
-                    {isExpanded && (
-                      <div className="mt-3 ml-6">
-                        {sprint.description && (
-                          <p className="text-sm text-muted-foreground mb-3 leading-relaxed">
-                            {sprint.description}
-                          </p>
-                        )}
-                        {projectGroups.length === 0 ? (
-                          <p className="text-sm text-muted-foreground py-2">No tasks in this sprint</p>
-                        ) : (
-                          <div className="space-y-4">
-                          {projectGroups.map((group) => (
-                            <div key={group.projectName} className="space-y-2">
-                              <h5 className="text-sm font-medium text-foreground">
-                                {group.projectName} ({group.tasks.length} {group.tasks.length === 1 ? 'task' : 'tasks'})
-                              </h5>
-                              <div className="border rounded-md divide-y bg-card">
-                                {group.tasks.map((task) => (
-                                  <div
-                                    key={task.id}
-                                    className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/50 transition-colors cursor-pointer"
-                                    onClick={() => setEditingTask(task)}
-                                  >
-                                    <span
-                                      className={cn(
-                                        'w-2 h-2 rounded-full flex-shrink-0',
-                                        task.priority === 'urgent' && 'bg-priority-urgent',
-                                        task.priority === 'high' && 'bg-priority-high',
-                                        task.priority === 'medium' && 'bg-priority-medium',
-                                        task.priority === 'low' && 'bg-priority-low'
-                                      )}
-                                    />
-                                    <span className="flex-1 truncate text-foreground" title={task.title}>
-                                      {task.title}
-                                    </span>
-                                    {task.assignees && task.assignees.length > 0 && (
-                                      <div className="flex -space-x-1.5 shrink-0">
-                                        {task.assignees.slice(0, 3).map((assignee) => (
-                                          <div
-                                            key={assignee.id}
-                                            className={cn(
-                                              'h-6 w-6 rounded-full text-white text-[10px] font-medium flex items-center justify-center border-2 border-background ring-1 ring-border/50',
-                                              getAvatarColor(assignee.id || assignee.userId)
-                                            )}
-                                            title={assignee.user?.displayName}
-                                          >
-                                            {assignee.user?.displayName?.[0]?.toUpperCase() || '?'}
-                                          </div>
-                                        ))}
-                                        {task.assignees.length > 3 && (
-                                          <div className="h-6 w-6 rounded-full bg-muted text-muted-foreground text-[10px] font-medium flex items-center justify-center border-2 border-background">
-                                            +{task.assignees.length - 3}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                    <span className={cn(getStatusPillClasses(task.status), 'shrink-0')}>
-                                      {formatStatusLabel(task.status)}
-                                    </span>
-                                    {task.dueDate && (
-                                      <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 whitespace-nowrap">
-                                        <Calendar className="h-3 w-3" />
-                                        {formatDate(task.dueDate)}
-                                      </span>
-                                    )}
-                                    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                                    <Select
-                                      value={undefined}
-                                      onValueChange={(value) => {
-                                        if (value === '__backlog__') {
-                                          handleMoveTask(task.id, null);
-                                        } else {
-                                          const targetSprint = otherActiveSprints.find((s) => s.id === value);
-                                          handleMoveTask(task.id, value, targetSprint?.name);
-                                        }
-                                      }}
-                                    >
-                                      <SelectTrigger className="h-7 w-36 text-xs shrink-0">
-                                        <SelectValue placeholder="Move to..." />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="__backlog__">
-                                          <span className="flex items-center gap-1">
-                                            <ArrowRight className="h-3 w-3" /> Backlog
-                                          </span>
-                                        </SelectItem>
-                                        {otherActiveSprints.map((s) => (
-                                          <SelectItem key={s.id} value={s.id}>
-                                            <span className="flex items-center gap-1">
-                                              <ArrowRight className="h-3 w-3" /> {s.name}
-                                            </span>
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </Card>
-                );
-              })}
+                  {completedSprints.map((sprint) => (
+                    <SprintCard
+                      key={sprint.id}
+                      sprint={sprint}
+                      isActive={false}
+                      isExpanded={expandedSprintIds.has(sprint.id)}
+                      moveTargets={activeSprints.filter((s) => s.id !== sprint.id)}
+                      onToggleExpand={toggleSprintExpanded}
+                      onEdit={handleOpenEditDialog}
+                      onMoveTask={handleMoveTask}
+                      onTaskClick={setEditingTask}
+                    />
+                  ))}
                 </>
               )}
             </>
@@ -1349,243 +990,53 @@ export default function GlobalSprintsPage() {
       </div>
     </div>
 
-    {/* Create Sprint Dialog */}
-    <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Create New Sprint</DialogTitle>
-          <DialogDescription>
-            Create a new sprint to organize tasks
-          </DialogDescription>
-        </DialogHeader>
+    {/* Sprint dialogs */}
+    <CreateSprintDialog
+      open={showCreateDialog}
+      onOpenChange={setShowCreateDialog}
+      name={newSprintName}
+      onNameChange={setNewSprintName}
+      description={newSprintDescription}
+      onDescriptionChange={setNewSprintDescription}
+      startDate={newSprintStartDate}
+      onStartDateChange={setNewSprintStartDate}
+      endDate={newSprintEndDate}
+      onEndDateChange={setNewSprintEndDate}
+      error={createError}
+      onCancel={() => { setShowCreateDialog(false); setCreateError(''); }}
+      onCreate={handleCreateSprint}
+    />
 
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="new-sprint-name">
-              Name <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="new-sprint-name"
-              value={newSprintName}
-              onChange={(e) => setNewSprintName(e.target.value)}
-              placeholder="Sprint name"
-              maxLength={100}
-            />
-          </div>
+    <EditSprintDialog
+      open={showEditDialog}
+      onOpenChange={setShowEditDialog}
+      name={editName}
+      onNameChange={setEditName}
+      description={editDescription}
+      onDescriptionChange={setEditDescription}
+      startDate={editStartDate}
+      onStartDateChange={setEditStartDate}
+      endDate={editEndDate}
+      onEndDateChange={setEditEndDate}
+      error={editError}
+      onCancel={() => { setShowEditDialog(false); setEditError(''); }}
+      onSave={handleSaveEdit}
+    />
 
-          <div className="space-y-1.5">
-            <Label htmlFor="new-sprint-desc">Description</Label>
-            <Textarea
-              id="new-sprint-desc"
-              value={newSprintDescription}
-              onChange={(e) => setNewSprintDescription(e.target.value)}
-              placeholder="Sprint goals or context (optional)"
-              maxLength={500}
-              rows={3}
-              className="resize-none"
-            />
-            <p className="text-xs text-muted-foreground text-right">{newSprintDescription.length}/500</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="new-start-date">
-                Start Date <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="new-start-date"
-                type="date"
-                value={newSprintStartDate}
-                onChange={(e) => setNewSprintStartDate(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="new-end-date">
-                End Date <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="new-end-date"
-                type="date"
-                value={newSprintEndDate}
-                onChange={(e) => setNewSprintEndDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {createError && <p className="text-sm text-destructive">{createError}</p>}
-        </div>
-
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setShowCreateDialog(false);
-              setCreateError('');
-            }}
-          >
-            Cancel
-          </Button>
-          <Button onClick={handleCreateSprint}>
-            Create Sprint
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    {/* Edit Sprint Dialog */}
-    <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit Sprint</DialogTitle>
-          <DialogDescription>Update sprint details</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-sprint-name">Name <span className="text-destructive">*</span></Label>
-            <Input id="edit-sprint-name" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Sprint name" maxLength={100} autoFocus />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-sprint-desc">Description</Label>
-            <Textarea id="edit-sprint-desc" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="Sprint goals or context (optional)" maxLength={500} rows={3} className="resize-none" />
-            <p className="text-xs text-muted-foreground text-right">{editDescription.length}/500</p>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-start-date">Start Date <span className="text-destructive">*</span></Label>
-              <Input id="edit-start-date" type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-end-date">End Date <span className="text-destructive">*</span></Label>
-              <Input id="edit-end-date" type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} />
-            </div>
-          </div>
-          {editError && <p className="text-sm text-destructive">{editError}</p>}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { setShowEditDialog(false); setEditError(''); }}>Cancel</Button>
-          <Button onClick={handleSaveEdit}>Update Sprint</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    {/* Close Sprint Dialog */}
-    <Dialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Close sprint</DialogTitle>
-          <DialogDescription>
-            {closingSprint && (() => {
-              const incompleteTasks = (closingSprint.tasks || []).filter((t) => t.status !== 'done');
-              if (incompleteTasks.length === 0) {
-                return `All tasks are complete. Close this sprint?`;
-              }
-              return `${closingSprint.name} has ${incompleteTasks.length} incomplete task${incompleteTasks.length === 1 ? '' : 's'}. Choose where to move them.`;
-            })()}
-          </DialogDescription>
-        </DialogHeader>
-
-        {closingSprint && (() => {
-          const allTasks = closingSprint.tasks || [];
-          const incompleteTasks = allTasks.filter((t) => t.status !== 'done');
-          const completedCount = allTasks.filter((t) => t.status === 'done').length;
-          const otherActive = activeSprints.filter((s) => s.id !== closingSprint.id);
-          const selectedSprintName = otherActive.find((s) => s.id === closeNextSprintId)?.name;
-
-          if (incompleteTasks.length === 0) {
-            return (
-              <p className="text-sm text-muted-foreground">
-                All {allTasks.length} task{allTasks.length === 1 ? '' : 's'} in this sprint are marked as done.
-              </p>
-            );
-          }
-
-          return (
-            <div className="space-y-4">
-              {/* Incomplete task list */}
-              <div className="border rounded-md max-h-48 overflow-y-auto">
-                {incompleteTasks.map((task, idx) => (
-                  <div
-                    key={task.id}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2 text-sm',
-                      idx < incompleteTasks.length - 1 && 'border-b'
-                    )}
-                  >
-                    <span className={cn('w-2 h-2 rounded-full flex-shrink-0', getPriorityDotColor(task.priority))} />
-                    <span className="flex-1 truncate text-foreground">{task.title}</span>
-                    <span className={cn(getStatusPillClasses(task.status), 'flex-shrink-0')}>
-                      {formatStatusLabel(task.status)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Radio group */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Move incomplete tasks to:</Label>
-                <RadioGroup value={closeAction} onValueChange={(v) => setCloseAction(v as 'backlog' | 'next_sprint')}>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="backlog" id="close-backlog" />
-                    <Label htmlFor="close-backlog" className="cursor-pointer">
-                      <span className="text-sm font-medium">Backlog</span>
-                      <span className="text-xs text-muted-foreground ml-2">Remove sprint assignment</span>
-                    </Label>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem
-                        value="next_sprint"
-                        id="close-next-sprint"
-                        disabled={otherActive.length === 0}
-                      />
-                      <Label htmlFor="close-next-sprint" className={cn("cursor-pointer", otherActive.length === 0 && "opacity-50")}>
-                        <span className="text-sm font-medium">Move to sprint</span>
-                        {otherActive.length === 0 && (
-                          <span className="text-xs text-muted-foreground ml-2">No other active sprints</span>
-                        )}
-                      </Label>
-                    </div>
-                    {closeAction === 'next_sprint' && otherActive.length > 0 && (
-                      <div className="ml-6">
-                        <Select value={closeNextSprintId || undefined} onValueChange={setCloseNextSprintId}>
-                          <SelectTrigger className="h-8 w-full text-xs">
-                            <SelectValue placeholder="Select a sprint..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {otherActive.map((s) => (
-                              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
-                </RadioGroup>
-              </div>
-
-              {/* Summary */}
-              <div className="bg-muted rounded-md p-3">
-                <p className="text-sm text-muted-foreground">
-                  {completedCount} completed task{completedCount === 1 ? '' : 's'} will stay in this sprint's history. {incompleteTasks.length} incomplete task{incompleteTasks.length === 1 ? '' : 's'} will be moved to {closeAction === 'backlog' ? 'backlog' : (selectedSprintName || 'the selected sprint')}.
-                </p>
-              </div>
-            </div>
-          );
-        })()}
-
-        {closeError && <p className="text-sm text-destructive">{closeError}</p>}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { setShowCloseDialog(false); setClosingSprint(null); }}>
-            Cancel
-          </Button>
-          <Button variant="destructive" onClick={handleCloseSprint} disabled={closeLoading}>
-            {closeLoading ? 'Closing...' : 'Close sprint'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <CloseSprintDialog
+      open={showCloseDialog}
+      onOpenChange={setShowCloseDialog}
+      closingSprint={closingSprint}
+      otherActive={closingSprint ? activeSprints.filter((s) => s.id !== closingSprint.id) : []}
+      closeAction={closeAction}
+      onCloseActionChange={setCloseAction}
+      closeNextSprintId={closeNextSprintId}
+      onCloseNextSprintIdChange={setCloseNextSprintId}
+      error={closeError}
+      loading={closeLoading}
+      onCancel={() => { setShowCloseDialog(false); setClosingSprint(null); }}
+      onConfirm={handleCloseSprint}
+    />
 
     {/* Task Create Drawer */}
     {showTaskDrawer && (

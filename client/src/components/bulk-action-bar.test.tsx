@@ -1,10 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
 import { BulkActionBar } from '@/components/bulk-action-bar'
 import { apiGet, apiPut } from '@/lib/api'
 import { invalidateProjects } from '@/hooks/use-projects'
 import type { Task } from '@/types'
+
+// The component reads sprints via the useSprints query, so it needs a provider.
+function renderWithClient(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
 
 vi.mock('@/lib/api', () => ({
   apiGet: vi.fn(),
@@ -37,7 +45,7 @@ describe('BulkActionBar — Mark as Done', () => {
   it('bulk-updates status to done and invalidates the projects cache', async () => {
     const onActionComplete = vi.fn()
 
-    render(
+    renderWithClient(
       <BulkActionBar
         selectedTaskIds={new Set(['t1'])}
         tasks={[task]}

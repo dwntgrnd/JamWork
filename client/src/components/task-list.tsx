@@ -1,68 +1,31 @@
 import { useEffect, useState, useRef, KeyboardEvent } from "react";
-import { apiGet, apiPut, apiPost } from "@/lib/api";
-import { invalidateProjects } from "@/hooks/use-projects";
+import { apiPut, apiPost } from "@/lib/api";
+import { invalidateProjects, useProjects } from "@/hooks/use-projects";
+import { useTasks, tasksKey, type TasksParams } from "@/hooks/use-tasks";
+import { useUsers } from "@/hooks/use-users";
+import { queryClient } from "@/lib/query-client";
 import {
   Task,
   TaskAssignee,
   TaskFilterState,
-  STATUS_LABELS,
-  PRIORITY_LABELS,
-  EFFORT_LABELS,
-  UserSummary,
-  Project,
   Subtask,
 } from "@/types";
 import { useAuth } from "@/hooks/use-auth";
 import { TaskDrawer } from "@/components/task-drawer";
+import { TaskTableRow } from "@/components/task-table-row";
+import { AddTaskRow } from "@/components/add-task-row";
+import { TaskListEmptyState } from "@/components/task-list-empty";
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Link } from "react-router";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
-import {
-  ChevronRight,
-  ChevronDown,
-  Check,
-  GripVertical,
-  ListTodo,
-  Plus,
-  Loader2,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getDateUrgencyInfo } from "@/lib/date-utils";
-import {
-  getStatusChipClasses,
-  getPriorityDotColor,
-  getEffortBadgeClasses,
-} from "@/lib/style-tokens";
-import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  DropResult,
-} from "@hello-pangea/dnd";
-import { toast } from "sonner";
+import { DragDropContext, Droppable, DropResult } from "@hello-pangea/dnd";
 
 interface TaskListProps {
   projectId?: string;
@@ -82,14 +45,36 @@ export function TaskList({
   onSelectionChange,
 }: TaskListProps) {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // Server-side query params — TaskList sends its filters/sort to the API.
+  // The old code appended both the assigneeId prop and filters.assigneeId; PHP
+  // takes the last value, so filters.assigneeId wins when both are present.
+  const taskParams: TasksParams = {
+    projectId,
+    assigneeId: filters.assigneeId || assigneeId,
+    status: filters.status,
+    priority: filters.priority,
+    excludeCompleted: !filters.showCompleted,
+    sortBy: filters.sortBy,
+    sortDir: filters.sortDir,
+  };
+  const { data: tasks = [], isLoading: loading, refetch } = useTasks(taskParams);
+  const { data: users = [] } = useUsers();
+  const { data: projects = [] } = useProjects();
+
+  /** Optimistically rewrite the cached task list (preserves the old setTasks API). */
+  const setTasks = (updater: Task[] | ((prev: Task[]) => Task[])) => {
+    queryClient.setQueryData<Task[]>(tasksKey(taskParams), (prev = []) =>
+      typeof updater === "function"
+        ? (updater as (p: Task[]) => Task[])(prev)
+        : updater,
+    );
+  };
+
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [focusedRowIndex, setFocusedRowIndex] = useState(-1);
   const [savingFields, setSavingFields] = useState<Set<string>>(new Set());
-  const [users, setUsers] = useState<UserSummary[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
@@ -114,13 +99,19 @@ export function TaskList({
   // Show project column only when not viewing a specific project
   const showProjectColumn = !projectId;
 
+  // The query refetches automatically when projectId/assigneeId/filters change
+  // (they're part of the query key). The parent bumps refreshKey after creating a
+  // task from the header — refetch on change, skipping the initial render.
+  const firstRefresh = useRef(true);
   useEffect(() => {
-    fetchTasks();
-    fetchUsers();
-    if (!projectId) {
-      fetchProjects();
+    if (firstRefresh.current) {
+      firstRefresh.current = false;
+      return;
     }
-  }, [projectId, assigneeId, filters, refreshKey]);
+    refetch();
+  }, [refreshKey, refetch]);
+
+  const fetchTasks = () => refetch();
 
   // Keep a stable ref to avoid infinite loops when parent doesn't memoize callback
   const onSelectionChangeRef = useRef(onSelectionChange);
@@ -141,56 +132,6 @@ export function TaskList({
     setSelectedTaskIds(new Set());
     setLastSelectedIndex(null);
   }, [filters]);
-
-  const fetchUsers = async () => {
-    try {
-      const data = await apiGet<{ users: UserSummary[] }>("/auth/users");
-      setUsers(data.users);
-    } catch (err) {
-      console.error("Failed to fetch users:", err);
-      toast.error("Failed to load team members");
-    }
-  };
-
-  const fetchProjects = async () => {
-    try {
-      const data = await apiGet<{ projects: Project[] }>("/projects");
-      setProjects(data.projects);
-    } catch (err) {
-      console.error("Failed to fetch projects:", err);
-      toast.error("Failed to load projects");
-    }
-  };
-
-  const fetchTasks = async (options?: { silent?: boolean }) => {
-    try {
-      if (!options?.silent) {
-        setLoading(true);
-      }
-
-      // Build query params
-      const params = new URLSearchParams();
-      if (projectId) params.append("projectId", projectId);
-      if (assigneeId) params.append("assigneeId", assigneeId);
-      if (filters.status) params.append("status", filters.status);
-      if (filters.priority) params.append("priority", filters.priority);
-      if (filters.assigneeId) params.append("assigneeId", filters.assigneeId);
-      if (!filters.showCompleted) params.append("excludeCompleted", "true");
-      params.append("sortBy", filters.sortBy);
-      params.append("sortDir", filters.sortDir);
-
-      const data = await apiGet<{ tasks: Task[] }>(
-        `/tasks?${params.toString()}`,
-      );
-      setTasks(data.tasks);
-    } catch (err) {
-      console.error("Failed to fetch tasks:", err);
-    } finally {
-      if (!options?.silent) {
-        setLoading(false);
-      }
-    }
-  };
 
   const handleRefresh = () => {
     fetchTasks();
@@ -329,8 +270,6 @@ export function TaskList({
     }
   };
 
-  const getFirstName = (displayName?: string) =>
-    displayName?.split(" ")[0] || "?";
 
   const handleInlineEdit = async (
     taskId: string,
@@ -353,7 +292,7 @@ export function TaskList({
 
       // If a recurring task was marked done and cloned, refresh to show the new task
       if (result.clonedTask) {
-        await fetchTasks({ silent: true });
+        await fetchTasks();
       } else {
         // Optimistic update for instant visual feedback
         setTasks((prev) =>
@@ -377,7 +316,7 @@ export function TaskList({
           }),
         );
         // Silent re-fetch to re-apply server-side filters and sort order
-        await fetchTasks({ silent: true });
+        await fetchTasks();
       }
 
       // Show saved indicator briefly
@@ -554,91 +493,22 @@ export function TaskList({
     );
   }
 
-  if (tasks.length === 0 && !isAddingTask) {
+  if (tasks.length === 0) {
     return (
-      <div>
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <ListTodo className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-1">
-            No tasks yet
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-sm">
-            Create a task to get started, or adjust your filters.
-          </p>
-        </div>
-        {/* Inline add row below empty state */}
-        <div className="px-4 py-2">
-          <button
-            onClick={() => setIsAddingTask(true)}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground py-1 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Add task
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (tasks.length === 0 && isAddingTask) {
-    return (
-      <div>
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <ListTodo className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-1">
-            No tasks yet
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-sm">
-            Create your first task below.
-          </p>
-        </div>
-        <div className="px-4 py-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <Input
-                ref={addTaskInputRef}
-                value={newTaskTitle}
-                onChange={(e) => setNewTaskTitle(e.target.value)}
-                onKeyDown={handleAddTaskKeyDown}
-                placeholder="Task title..."
-                className="h-8 flex-1 text-sm"
-                disabled={isCreatingTask}
-                autoFocus
-              />
-              {!projectId && (
-                <Select
-                  value={selectedProjectId}
-                  onValueChange={handleProjectSelect}
-                >
-                  <SelectTrigger
-                    className={cn(
-                      "h-8 w-40 text-xs",
-                      addTaskError && !selectedProjectId && "border-red-400",
-                    )}
-                  >
-                    <SelectValue placeholder="Project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {isCreatingTask && (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              )}
-            </div>
-            {addTaskError && (
-              <p className="text-xs text-destructive mt-1 ml-1">
-                {addTaskError}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
+      <TaskListEmptyState
+        isAddingTask={isAddingTask}
+        onStartAdding={() => setIsAddingTask(true)}
+        newTaskTitle={newTaskTitle}
+        onTitleChange={setNewTaskTitle}
+        onKeyDown={handleAddTaskKeyDown}
+        isCreatingTask={isCreatingTask}
+        showProjectColumn={showProjectColumn}
+        selectedProjectId={selectedProjectId}
+        onProjectSelect={handleProjectSelect}
+        projects={projects}
+        addTaskError={addTaskError}
+        inputRef={addTaskInputRef}
+      />
     );
   }
 
@@ -714,585 +584,68 @@ export function TaskList({
                       "bg-interactive/10",
                   )}
                 >
-                  {tasks.map((task, index) => {
-                    const isExpanded = expandedTasks.has(task.id);
-                    const isFocused = index === focusedRowIndex;
-                    const hasSubtasks =
-                      task.subtasks && task.subtasks.length > 0;
-                    const completedSubtasks =
-                      task.subtasks?.filter((s) => s.completed).length || 0;
-                    const totalSubtasks = task.subtasks?.length || 0;
-
-                    return (
-                      <Draggable
-                        key={task.id}
-                        draggableId={task.id}
-                        index={index}
-                        isDragDisabled={!isDragEnabled}
-                      >
-                        {(provided, snapshot) => (
-                          <TableRow
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            className={cn(
-                              "group cursor-pointer border-b border-border hover:bg-muted/50 hover:shadow-sm transition-all duration-150",
-                              isFocused && "ring-2 ring-ring",
-                              snapshot.isDragging && "shadow-lg bg-card",
-                            )}
-                            onClick={() => {
-                              // If any tasks are selected, clicking row toggles checkbox instead of opening drawer
-                              if (selectedTaskIds.size > 0) {
-                                handleCheckboxClick(task.id, index, false);
-                              } else {
-                                setSelectedTask(task);
-                              }
-                            }}
-                          >
-                            {isDragEnabled && (
-                              <TableCell
-                                {...provided.dragHandleProps}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <GripVertical className="h-4 w-4 text-muted-foreground" />
-                              </TableCell>
-                            )}
-                            <TableCell onClick={(e) => e.stopPropagation()}>
-                              <Checkbox
-                                checked={selectedTaskIds.has(task.id)}
-                                onCheckedChange={() =>
-                                  handleCheckboxClick(task.id, index, false)
-                                }
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCheckboxClick(
-                                    task.id,
-                                    index,
-                                    e.shiftKey,
-                                  );
-                                }}
-                                className="transition-colors"
-                              />
-                            </TableCell>
-
-                            {/* Expand/collapse caret */}
-                            <TableCell className="px-0">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={cn(
-                                  "h-6 w-6 p-0 shrink-0 transition-opacity",
-                                  hasSubtasks
-                                    ? "opacity-100"
-                                    : "opacity-0 group-hover:opacity-100",
-                                )}
-                                aria-label={
-                                  isExpanded
-                                    ? "Collapse subtasks"
-                                    : "Expand subtasks"
-                                }
-                                aria-expanded={isExpanded}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleExpanded(task.id);
-                                }}
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </TableCell>
-
-                            {/* Title */}
-                            <TableCell className="max-w-0 w-[35%]">
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={cn(
-                                    "text-left hover:text-interactive text-sm font-semibold truncate",
-                                    task.status === "done" &&
-                                      "line-through text-muted-foreground",
-                                  )}
-                                  title={task.title}
-                                >
-                                  {task.title}
-                                </span>
-                                {hasSubtasks && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs shrink-0"
-                                  >
-                                    {completedSubtasks}/{totalSubtasks}
-                                  </Badge>
-                                )}
-                              </div>
-
-                              {/* Expanded subtask section */}
-                              {isExpanded && (
-                                <div className="mt-2 space-y-1">
-                                  {task.subtasks?.map((subtask) => (
-                                    <div
-                                      key={subtask.id}
-                                      className="flex items-center gap-2 text-sm text-muted-foreground"
-                                    >
-                                      <Checkbox
-                                        checked={subtask.completed}
-                                        onClick={(e) => e.stopPropagation()}
-                                        onCheckedChange={() =>
-                                          handleToggleSubtask(task.id, subtask)
-                                        }
-                                      />
-                                      <span
-                                        className={cn(
-                                          subtask.completed &&
-                                            "line-through text-muted-foreground",
-                                        )}
-                                      >
-                                        {subtask.title}
-                                      </span>
-                                    </div>
-                                  ))}
-
-                                  {/* Inline add subtask input */}
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <Plus className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                    <Input
-                                      ref={(el) => {
-                                        subtaskInputRefs.current[task.id] = el;
-                                      }}
-                                      value={newSubtaskTitles[task.id] || ""}
-                                      onChange={(e) =>
-                                        setNewSubtaskTitles((prev) => ({
-                                          ...prev,
-                                          [task.id]: e.target.value,
-                                        }))
-                                      }
-                                      onKeyDown={(e) =>
-                                        handleSubtaskInputKeyDown(e, task.id)
-                                      }
-                                      onClick={(e) => e.stopPropagation()}
-                                      placeholder="Add a subtask..."
-                                      className="h-7 flex-1 text-sm border-none shadow-none focus-visible:ring-0 bg-transparent placeholder:text-muted-foreground/50"
-                                      disabled={
-                                        addingSubtaskForTaskId === task.id
-                                      }
-                                    />
-                                    {addingSubtaskForTaskId === task.id && (
-                                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </TableCell>
-
-                            {/* Project */}
-                            {showProjectColumn && (
-                              <TableCell className="hidden lg:table-cell">
-                                {task.project ? (
-                                  <Link
-                                    to={`/projects/${task.project.id}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="text-sm text-muted-foreground hover:text-foreground hover:underline truncate block max-w-[160px]"
-                                    title={task.project.name}
-                                  >
-                                    {task.project.name}
-                                  </Link>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground/50">
-                                    &mdash;
-                                  </span>
-                                )}
-                              </TableCell>
-                            )}
-
-                            {/* Status - inline editable */}
-                            <TableCell>
-                              <div
-                                className="flex items-center gap-1"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Select
-                                  value={task.status}
-                                  onValueChange={(value) =>
-                                    handleInlineEdit(task.id, "status", value)
-                                  }
-                                >
-                                  <SelectTrigger
-                                    className={cn(
-                                      "h-7 w-30 border-none",
-                                      getStatusChipClasses(task.status),
-                                    )}
-                                  >
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="todo">
-                                      {STATUS_LABELS.todo}
-                                    </SelectItem>
-                                    <SelectItem value="in_progress">
-                                      {STATUS_LABELS.in_progress}
-                                    </SelectItem>
-                                    <SelectItem value="blocked">
-                                      {STATUS_LABELS.blocked}
-                                    </SelectItem>
-                                    <SelectItem value="review">
-                                      {STATUS_LABELS.review}
-                                    </SelectItem>
-                                    <SelectItem value="done">
-                                      {STATUS_LABELS.done}
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                {savingFields.has(`${task.id}-status`) && (
-                                  <Check className="h-3 w-3 text-success" />
-                                )}
-                              </div>
-                            </TableCell>
-
-                            {/* Priority - inline editable */}
-                            <TableCell>
-                              <div
-                                className="flex items-center gap-1.5"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {getPriorityDotColor(task.priority) && (
-                                  <div
-                                    className={cn(
-                                      "h-2.5 w-2.5 rounded-full shrink-0",
-                                      getPriorityDotColor(task.priority),
-                                    )}
-                                  />
-                                )}
-                                <Select
-                                  value={task.priority}
-                                  onValueChange={(value) =>
-                                    handleInlineEdit(task.id, "priority", value)
-                                  }
-                                >
-                                  <SelectTrigger className="h-7 text-xs border-none bg-transparent px-1">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="low">
-                                      {PRIORITY_LABELS.low}
-                                    </SelectItem>
-                                    <SelectItem value="medium">
-                                      {PRIORITY_LABELS.medium}
-                                    </SelectItem>
-                                    <SelectItem value="high">
-                                      {PRIORITY_LABELS.high}
-                                    </SelectItem>
-                                    <SelectItem value="urgent">
-                                      {PRIORITY_LABELS.urgent}
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                {savingFields.has(`${task.id}-priority`) && (
-                                  <Check className="h-3 w-3 text-success" />
-                                )}
-                              </div>
-                            </TableCell>
-
-                            {/* Effort - inline editable */}
-                            <TableCell className="hidden lg:table-cell">
-                              <div
-                                className="flex items-center gap-1"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Select
-                                  value={
-                                    task.effort ? task.effort.toString() : "none"
-                                  }
-                                  onValueChange={(v) =>
-                                    handleInlineEdit(
-                                      task.id,
-                                      "effort",
-                                      v === "none" ? null : parseInt(v),
-                                    )
-                                  }
-                                >
-                                  <SelectTrigger
-                                    className={cn(
-                                      "h-7 w-auto min-w-0 gap-0.5 px-2 border-none text-xs",
-                                      task.effort
-                                        ? getEffortBadgeClasses(task.effort)
-                                        : "text-muted-foreground/50",
-                                    )}
-                                  >
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    <SelectItem value="1">
-                                      {EFFORT_LABELS[1]}
-                                    </SelectItem>
-                                    <SelectItem value="2">
-                                      {EFFORT_LABELS[2]}
-                                    </SelectItem>
-                                    <SelectItem value="4">
-                                      {EFFORT_LABELS[4]}
-                                    </SelectItem>
-                                    <SelectItem value="8">
-                                      {EFFORT_LABELS[8]}
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                {savingFields.has(`${task.id}-effort`) && (
-                                  <Check className="h-3 w-3 text-success" />
-                                )}
-                              </div>
-                            </TableCell>
-
-                            {/* Assignees - inline editable */}
-                            <TableCell className="hidden sm:table-cell">
-                              <div onClick={(e) => e.stopPropagation()}>
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <button
-                                      className={cn(
-                                        "flex items-center gap-1 text-sm h-7 px-1 rounded hover:bg-muted/50 transition-colors",
-                                        task.assignees &&
-                                          task.assignees.length > 0
-                                          ? "text-foreground"
-                                          : "text-muted-foreground/50",
-                                      )}
-                                    >
-                                      {task.assignees &&
-                                      task.assignees.length > 0 ? (
-                                        <span className="truncate max-w-[80px]">
-                                          {getFirstName(
-                                            task.assignees[0]?.user
-                                              ?.displayName,
-                                          )}
-                                          {task.assignees.length > 1 && (
-                                            <span className="text-muted-foreground ml-1">
-                                              +{task.assignees.length - 1}
-                                            </span>
-                                          )}
-                                        </span>
-                                      ) : (
-                                        <span>&mdash;</span>
-                                      )}
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent
-                                    className="w-52 p-2"
-                                    align="start"
-                                  >
-                                    <div className="space-y-0.5 max-h-48 overflow-y-auto">
-                                      {users.map((u) => {
-                                        const isAssigned =
-                                          task.assignees?.some(
-                                            (a) => a.userId === u.id,
-                                          ) || false;
-                                        return (
-                                          <label
-                                            key={u.id}
-                                            className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/50 rounded cursor-pointer text-sm"
-                                          >
-                                            <Checkbox
-                                              checked={isAssigned}
-                                              onCheckedChange={() => {
-                                                const currentIds =
-                                                  task.assignees?.map(
-                                                    (a) => a.userId,
-                                                  ) || [];
-                                                const newIds = isAssigned
-                                                  ? currentIds.filter(
-                                                      (id) => id !== u.id,
-                                                    )
-                                                  : [...currentIds, u.id];
-                                                handleInlineEdit(
-                                                  task.id,
-                                                  "assigneeIds",
-                                                  newIds,
-                                                );
-                                              }}
-                                            />
-                                            <span>{u.displayName}</span>
-                                          </label>
-                                        );
-                                      })}
-                                    </div>
-                                    {task.assignees &&
-                                      task.assignees.length > 0 && (
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="w-full mt-1 text-xs text-muted-foreground"
-                                          onClick={() =>
-                                            handleInlineEdit(
-                                              task.id,
-                                              "assigneeIds",
-                                              [],
-                                            )
-                                          }
-                                        >
-                                          Clear all
-                                        </Button>
-                                      )}
-                                  </PopoverContent>
-                                </Popover>
-                                {savingFields.has(
-                                  `${task.id}-assigneeIds`,
-                                ) && (
-                                  <Check className="h-3 w-3 text-success inline-block ml-1" />
-                                )}
-                              </div>
-                            </TableCell>
-
-                            {/* Due Date - inline editable */}
-                            <TableCell className="hidden md:table-cell">
-                              <div onClick={(e) => e.stopPropagation()}>
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <button className="text-left h-7 px-1 rounded hover:bg-muted/50 transition-colors">
-                                      {(() => {
-                                        const urgency = getDateUrgencyInfo(
-                                          task.dueDate,
-                                          task.status,
-                                        );
-                                        return (
-                                          <span
-                                            className={cn(
-                                              "text-xs whitespace-nowrap",
-                                              urgency.className,
-                                            )}
-                                          >
-                                            {urgency.label}
-                                          </span>
-                                        );
-                                      })()}
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent
-                                    className="w-auto p-3"
-                                    align="start"
-                                  >
-                                    <div className="flex flex-col gap-2">
-                                      <Input
-                                        type="date"
-                                        value={
-                                          task.dueDate
-                                            ? new Date(task.dueDate)
-                                                .toISOString()
-                                                .split("T")[0]
-                                            : ""
-                                        }
-                                        onChange={(e) =>
-                                          handleInlineEdit(
-                                            task.id,
-                                            "dueDate",
-                                            e.target.value
-                                              ? new Date(
-                                                  e.target.value,
-                                                ).toISOString()
-                                              : null,
-                                          )
-                                        }
-                                        className="h-8 text-sm"
-                                      />
-                                      {task.dueDate && (
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="text-xs text-muted-foreground"
-                                          onClick={() =>
-                                            handleInlineEdit(
-                                              task.id,
-                                              "dueDate",
-                                              null,
-                                            )
-                                          }
-                                        >
-                                          Clear
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
-                                {savingFields.has(`${task.id}-dueDate`) && (
-                                  <Check className="h-3 w-3 text-success inline-block ml-1" />
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </Draggable>
-                    );
-                  })}
+                  {tasks.map((task, index) => (
+                    <TaskTableRow
+                      key={task.id}
+                      task={task}
+                      index={index}
+                      isDragEnabled={isDragEnabled}
+                      showProjectColumn={showProjectColumn}
+                      isExpanded={expandedTasks.has(task.id)}
+                      isFocused={index === focusedRowIndex}
+                      isSelected={selectedTaskIds.has(task.id)}
+                      savingFields={savingFields}
+                      users={users}
+                      newSubtaskTitle={newSubtaskTitles[task.id] || ""}
+                      isAddingSubtask={addingSubtaskForTaskId === task.id}
+                      subtaskInputRef={(el) => {
+                        subtaskInputRefs.current[task.id] = el;
+                      }}
+                      onRowClick={() => {
+                        if (selectedTaskIds.size > 0) {
+                          handleCheckboxClick(task.id, index, false);
+                        } else {
+                          setSelectedTask(task);
+                        }
+                      }}
+                      onCheckboxClick={(shiftKey) =>
+                        handleCheckboxClick(task.id, index, shiftKey)
+                      }
+                      onToggleExpand={() => toggleExpanded(task.id)}
+                      onInlineEdit={(field, value) =>
+                        handleInlineEdit(task.id, field, value)
+                      }
+                      onToggleSubtask={(subtask) =>
+                        handleToggleSubtask(task.id, subtask)
+                      }
+                      onSubtaskTitleChange={(value) =>
+                        setNewSubtaskTitles((prev) => ({
+                          ...prev,
+                          [task.id]: value,
+                        }))
+                      }
+                      onSubtaskInputKeyDown={(e) =>
+                        handleSubtaskInputKeyDown(e, task.id)
+                      }
+                    />
+                  ))}
                   {provided.placeholder}
-                  {/* Inline add task row */}
-                  <TableRow className="hover:bg-transparent border-b-0">
-                    {!isAddingTask ? (
-                      <TableCell colSpan={columnCount} className="border-b-0">
-                        <button
-                          onClick={() => setIsAddingTask(true)}
-                          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground py-1 w-full transition-colors"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Add task
-                        </button>
-                      </TableCell>
-                    ) : (
-                      <>
-                        {isDragEnabled && <TableCell className="border-b-0" />}
-                        <TableCell className="border-b-0" />
-                        <TableCell className="border-b-0" />
-                        <TableCell className="border-b-0">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              ref={addTaskInputRef}
-                              value={newTaskTitle}
-                              onChange={(e) => setNewTaskTitle(e.target.value)}
-                              onKeyDown={handleAddTaskKeyDown}
-                              placeholder="Task title..."
-                              className="h-8 text-sm border-none shadow-none focus-visible:ring-0 bg-transparent"
-                              disabled={isCreatingTask}
-                              autoFocus
-                            />
-                            {isCreatingTask && (
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            )}
-                          </div>
-                          {addTaskError && (
-                            <p className="text-xs text-destructive mt-1 ml-1">
-                              {addTaskError}
-                            </p>
-                          )}
-                        </TableCell>
-                        {showProjectColumn && (
-                          <TableCell className="border-b-0 hidden lg:table-cell">
-                            {!projectId && (
-                              <Select
-                                value={selectedProjectId}
-                                onValueChange={handleProjectSelect}
-                              >
-                                <SelectTrigger
-                                  className={cn(
-                                    "h-8 w-full text-xs",
-                                    addTaskError &&
-                                      !selectedProjectId &&
-                                      "border-red-400",
-                                  )}
-                                >
-                                  <SelectValue placeholder="Project" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {projects.map((p) => (
-                                    <SelectItem key={p.id} value={p.id}>
-                                      {p.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            )}
-                          </TableCell>
-                        )}
-                        <TableCell className="border-b-0" colSpan={4} />
-                      </>
-                    )}
-                  </TableRow>
+                  <AddTaskRow
+                    isAddingTask={isAddingTask}
+                    onStartAdding={() => setIsAddingTask(true)}
+                    columnCount={columnCount}
+                    isDragEnabled={isDragEnabled}
+                    showProjectColumn={showProjectColumn}
+                    newTaskTitle={newTaskTitle}
+                    onTitleChange={setNewTaskTitle}
+                    onKeyDown={handleAddTaskKeyDown}
+                    isCreatingTask={isCreatingTask}
+                    addTaskError={addTaskError}
+                    selectedProjectId={selectedProjectId}
+                    onProjectSelect={handleProjectSelect}
+                    projects={projects}
+                    inputRef={addTaskInputRef}
+                  />
                 </TableBody>
               )}
             </Droppable>
