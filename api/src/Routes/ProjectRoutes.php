@@ -13,7 +13,6 @@ use Slim\Routing\RouteCollectorProxy;
 
 class ProjectRoutes
 {
-    private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
 
     private const FETCH_QUERY = '
         SELECT p.*,
@@ -129,7 +128,7 @@ class ProjectRoutes
             $group->put('/{id}', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(ProjectRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'id must be a valid UUID',
                     ]));
@@ -230,7 +229,7 @@ class ProjectRoutes
             $group->delete('/{id}', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(ProjectRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'id must be a valid UUID',
                     ]));

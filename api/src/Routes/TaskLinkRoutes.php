@@ -13,7 +13,6 @@ use Slim\Routing\RouteCollectorProxy;
 
 class TaskLinkRoutes
 {
-    private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
 
     private const FETCH_QUERY = '
         SELECT tl.*,
@@ -45,7 +44,7 @@ class TaskLinkRoutes
             $group->get('', function (Request $request, Response $response, array $args) {
                 $taskId = $args['taskId'];
 
-                if (!preg_match(TaskLinkRoutes::UUID_PATTERN, $taskId)) {
+                if (!Validator::isUuid($taskId)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'taskId must be a valid UUID',
                     ]));
@@ -81,7 +80,7 @@ class TaskLinkRoutes
             $group->post('', function (Request $request, Response $response, array $args) {
                 $taskId = $args['taskId'];
 
-                if (!preg_match(TaskLinkRoutes::UUID_PATTERN, $taskId)) {
+                if (!Validator::isUuid($taskId)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'taskId must be a valid UUID',
                     ]));
@@ -152,7 +151,7 @@ class TaskLinkRoutes
                 $taskId = $args['taskId'];
                 $linkId = $args['linkId'];
 
-                if (!preg_match(TaskLinkRoutes::UUID_PATTERN, $taskId)) {
+                if (!Validator::isUuid($taskId)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'taskId must be a valid UUID',
                     ]));
@@ -161,7 +160,7 @@ class TaskLinkRoutes
                         ->withStatus(400);
                 }
 
-                if (!preg_match(TaskLinkRoutes::UUID_PATTERN, $linkId)) {
+                if (!Validator::isUuid($linkId)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'linkId must be a valid UUID',
                     ]));

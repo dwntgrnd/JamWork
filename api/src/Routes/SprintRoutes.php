@@ -14,7 +14,6 @@ use Slim\Routing\RouteCollectorProxy;
 
 class SprintRoutes
 {
-    private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
 
     private const FETCH_QUERY = '
         SELECT s.*,
@@ -251,7 +250,7 @@ class SprintRoutes
             $group->put('/{id}/close', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(SprintRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'id must be a valid UUID',
                     ]));
@@ -350,7 +349,7 @@ class SprintRoutes
             $group->get('/{id}', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(SprintRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'id must be a valid UUID',
                     ]));
@@ -388,7 +387,7 @@ class SprintRoutes
             $group->put('/{id}', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(SprintRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'id must be a valid UUID',
                     ]));
@@ -481,7 +480,7 @@ class SprintRoutes
             $group->delete('/{id}', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(SprintRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'id must be a valid UUID',
                     ]));

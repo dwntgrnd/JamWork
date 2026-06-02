@@ -16,7 +16,6 @@ use Slim\Routing\RouteCollectorProxy;
 
 class AdminRoutes
 {
-    private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
 
     public static function register(App $app): void
     {
@@ -186,7 +185,7 @@ class AdminRoutes
             $group->put('/users/{id}/reset-password', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(AdminRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'id must be a valid UUID',
                     ]));
@@ -240,7 +239,7 @@ class AdminRoutes
             $group->put('/users/{id}', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(AdminRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'id must be a valid UUID',
                     ]));
@@ -340,7 +339,7 @@ class AdminRoutes
             $group->delete('/users/{id}', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(AdminRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'id must be a valid UUID',
                     ]));

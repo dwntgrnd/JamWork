@@ -15,7 +15,6 @@ use Slim\Routing\RouteCollectorProxy;
 
 class TaskRoutes
 {
-    private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
 
     private const FETCH_QUERY = '
         SELECT t.*,
@@ -71,7 +70,7 @@ class TaskRoutes
                     return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
                 }
                 foreach ($data['taskIds'] as $taskId) {
-                    if (!is_string($taskId) || !preg_match(TaskRoutes::UUID_PATTERN, $taskId)) {
+                    if (!Validator::isUuid($taskId)) {
                         $response->getBody()->write(json_encode(['error' => 'taskIds must contain only valid UUIDs']));
                         return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
                     }
@@ -92,21 +91,14 @@ class TaskRoutes
                 }
 
                 $fields = $data['fields'];
-                if (isset($fields['status']) && !in_array($fields['status'], ['todo', 'in_progress', 'blocked', 'review', 'done'], true)) {
-                    $response->getBody()->write(json_encode(['error' => 'status must be one of: todo, in_progress, blocked, review, done']));
-                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
-                }
-                if (isset($fields['priority']) && !in_array($fields['priority'], ['low', 'medium', 'high', 'urgent'], true)) {
-                    $response->getBody()->write(json_encode(['error' => 'priority must be one of: low, medium, high, urgent']));
-                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
-                }
-                if (array_key_exists('sprintId', $fields) && $fields['sprintId'] !== null && !preg_match(TaskRoutes::UUID_PATTERN, $fields['sprintId'])) {
-                    $response->getBody()->write(json_encode(['error' => 'sprintId must be null or a valid UUID']));
-                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
-                }
-                if (array_key_exists('inSprintBacklog', $fields) && !is_bool($fields['inSprintBacklog'])) {
-                    $response->getBody()->write(json_encode(['error' => 'inSprintBacklog must be a boolean']));
-                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                $fieldErrors = Validator::validate($fields, [
+                    'status' => 'in:todo,in_progress,blocked,review,done',
+                    'priority' => 'in:low,medium,high,urgent',
+                    'sprintId' => 'nullable|uuid',
+                    'inSprintBacklog' => 'boolean',
+                ]);
+                if (!empty($fieldErrors)) {
+                    return Validator::respondWithErrors($response, $fieldErrors);
                 }
 
                 // Build dynamic SET clause
@@ -296,7 +288,7 @@ class TaskRoutes
                     'dueDate' => 'optional|nullable|iso8601',
                     'startDate' => 'optional|nullable|iso8601',
                     'recurrence' => 'optional|nullable|in:daily,weekly,biweekly,monthly',
-                    'effort' => 'optional|nullable',
+                    'effort' => 'optional|nullable|in:1,2,4,8',
                     'sprintId' => 'optional|nullable|uuid',
                     'projectId' => 'required|uuid',
                     'assigneeIds' => 'optional|uuid_array',
@@ -306,16 +298,6 @@ class TaskRoutes
 
                 if (!empty($errors)) {
                     return Validator::respondWithErrors($response, $errors);
-                }
-
-                // Effort validation (manual — Validator doesn't have int-in rule)
-                if (isset($data['effort']) && $data['effort'] !== null) {
-                    if (!in_array((int) $data['effort'], [1, 2, 4, 8], true)) {
-                        $response->getBody()->write(json_encode([
-                            'errors' => [['field' => 'effort', 'message' => 'effort must be one of: 1, 2, 4, 8']],
-                        ]));
-                        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
-                    }
                 }
 
                 // Verify project exists (and read its notification default to seed the task flag)
@@ -450,7 +432,7 @@ class TaskRoutes
             $group->put('/{id}/move', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(TaskRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode(['error' => 'id must be a valid UUID']));
                     return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
                 }
@@ -526,7 +508,7 @@ class TaskRoutes
             $group->get('/{id}', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(TaskRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode(['error' => 'id must be a valid UUID']));
                     return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
                 }
@@ -568,7 +550,7 @@ class TaskRoutes
             $group->put('/{id}', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(TaskRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode(['error' => 'id must be a valid UUID']));
                     return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
                 }
@@ -584,7 +566,7 @@ class TaskRoutes
                     'dueDate' => 'optional|nullable|iso8601',
                     'startDate' => 'optional|nullable|iso8601',
                     'recurrence' => 'optional|nullable|in:daily,weekly,biweekly,monthly',
-                    'effort' => 'optional|nullable',
+                    'effort' => 'optional|nullable|in:1,2,4,8',
                     'sprintId' => 'optional|nullable|uuid',
                     'assigneeIds' => 'optional|uuid_array',
                     'labelIds' => 'optional|uuid_array',
@@ -595,15 +577,6 @@ class TaskRoutes
                     return Validator::respondWithErrors($response, $errors);
                 }
 
-                // Effort validation (same as POST)
-                if (isset($data['effort']) && $data['effort'] !== null) {
-                    if (!in_array((int) $data['effort'], [1, 2, 4, 8], true)) {
-                        $response->getBody()->write(json_encode([
-                            'errors' => [['field' => 'effort', 'message' => 'effort must be one of: 1, 2, 4, 8']],
-                        ]));
-                        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
-                    }
-                }
 
                 $db = Database::getInstance();
 
@@ -917,7 +890,7 @@ class TaskRoutes
             $group->delete('/{id}', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(TaskRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode(['error' => 'id must be a valid UUID']));
                     return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
                 }
@@ -946,7 +919,7 @@ class TaskRoutes
             $group->post('/{id}/subtasks', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(TaskRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode(['error' => 'id must be a valid UUID']));
                     return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
                 }
@@ -1012,11 +985,11 @@ class TaskRoutes
                 $taskId = $args['taskId'];
                 $subtaskId = $args['subtaskId'];
 
-                if (!preg_match(TaskRoutes::UUID_PATTERN, $taskId)) {
+                if (!Validator::isUuid($taskId)) {
                     $response->getBody()->write(json_encode(['error' => 'taskId must be a valid UUID']));
                     return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
                 }
-                if (!preg_match(TaskRoutes::UUID_PATTERN, $subtaskId)) {
+                if (!Validator::isUuid($subtaskId)) {
                     $response->getBody()->write(json_encode(['error' => 'subtaskId must be a valid UUID']));
                     return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
                 }
@@ -1087,11 +1060,11 @@ class TaskRoutes
                 $taskId = $args['taskId'];
                 $subtaskId = $args['subtaskId'];
 
-                if (!preg_match(TaskRoutes::UUID_PATTERN, $taskId)) {
+                if (!Validator::isUuid($taskId)) {
                     $response->getBody()->write(json_encode(['error' => 'taskId must be a valid UUID']));
                     return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
                 }
-                if (!preg_match(TaskRoutes::UUID_PATTERN, $subtaskId)) {
+                if (!Validator::isUuid($subtaskId)) {
                     $response->getBody()->write(json_encode(['error' => 'subtaskId must be a valid UUID']));
                     return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
                 }
