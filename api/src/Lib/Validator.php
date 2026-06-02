@@ -6,6 +6,15 @@ use Psr\Http\Message\ResponseInterface as Response;
 
 class Validator
 {
+    /** Canonical UUID (v4-shaped) pattern. Single source of truth for the whole API. */
+    public const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
+
+    /** True when $value is a string matching {@see self::UUID_PATTERN}. Safe for any input type. */
+    public static function isUuid(mixed $value): bool
+    {
+        return is_string($value) && preg_match(self::UUID_PATTERN, $value) === 1;
+    }
+
     /**
      * Validate data against rules.
      * Rules are pipe-separated: 'required|email|min:6'
@@ -54,7 +63,12 @@ class Validator
      */
     public static function respondWithErrors(Response $response, array $errors): Response
     {
-        $payload = json_encode(['errors' => $errors]);
+        // `errors` carries the full field-level detail; `error` mirrors the first message
+        // so generic clients (which read `error`/`message`) surface something specific.
+        $payload = json_encode([
+            'error' => $errors[0]['message'] ?? 'Validation failed',
+            'errors' => $errors,
+        ]);
         $response->getBody()->write($payload);
         return $response
             ->withHeader('Content-Type', 'application/json')
@@ -123,7 +137,8 @@ class Validator
     private static function ruleIn(string $field, mixed $value, string $options): ?array
     {
         $allowed = explode(',', $options);
-        if ($value !== null && $value !== '' && !in_array($value, $allowed, true)) {
+        // Compare as strings so numeric enums (e.g. effort `in:1,2,4,8`) match JSON numbers.
+        if ($value !== null && $value !== '' && is_scalar($value) && !in_array((string) $value, $allowed, true)) {
             return ['field' => $field, 'message' => "{$field} must be one of: {$options}"];
         }
         return null;
@@ -131,8 +146,7 @@ class Validator
 
     private static function ruleUuid(string $field, mixed $value): ?array
     {
-        $pattern = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
-        if ($value !== null && $value !== '' && !preg_match($pattern, $value)) {
+        if ($value !== null && $value !== '' && !preg_match(self::UUID_PATTERN, $value)) {
             return ['field' => $field, 'message' => "{$field} must be a valid UUID"];
         }
         return null;
@@ -209,9 +223,8 @@ class Validator
         if (!is_array($value)) {
             return ['field' => $field, 'message' => "{$field} must be an array of UUIDs"];
         }
-        $pattern = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
         foreach ($value as $item) {
-            if (!is_string($item) || !preg_match($pattern, $item)) {
+            if (!self::isUuid($item)) {
                 return ['field' => $field, 'message' => "{$field} must contain only valid UUIDs"];
             }
         }

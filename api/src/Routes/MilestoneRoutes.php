@@ -13,7 +13,6 @@ use Slim\Routing\RouteCollectorProxy;
 
 class MilestoneRoutes
 {
-    private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
 
     private static function mapMilestone(array $row): array
     {
@@ -111,7 +110,7 @@ class MilestoneRoutes
             $group->put('/{id}', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(MilestoneRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'id must be a valid UUID',
                     ]));
@@ -193,7 +192,7 @@ class MilestoneRoutes
             $group->delete('/{id}', function (Request $request, Response $response, array $args) {
                 $id = $args['id'];
 
-                if (!preg_match(MilestoneRoutes::UUID_PATTERN, $id)) {
+                if (!Validator::isUuid($id)) {
                     $response->getBody()->write(json_encode([
                         'error' => 'id must be a valid UUID',
                     ]));
