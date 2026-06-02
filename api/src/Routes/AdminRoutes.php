@@ -223,7 +223,7 @@ class AdminRoutes
                 $passwordHash = Auth::hashPassword($temporaryPassword);
 
                 $stmt = $db->prepare(
-                    'UPDATE users SET password_hash = :hash, must_reset_password = 1 WHERE id = :id'
+                    'UPDATE users SET password_hash = :hash, must_reset_password = 1, token_version = token_version + 1 WHERE id = :id'
                 );
                 $stmt->execute(['hash' => $passwordHash, 'id' => $id]);
 
