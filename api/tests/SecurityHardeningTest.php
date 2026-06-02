@@ -39,5 +39,15 @@ check('S9: workspace name is HTML-escaped',
 check('S9: other fields still escaped (email)',
     str_contains($out, 'd@example.com'));
 
+echo "S8 — admin invite password policy\n";
+
+$rules = ['password' => 'optional|min:10'];
+check('S8: short provided password is rejected',
+    Validator::validate(['password' => 'short'], $rules) !== []);
+check('S8: valid provided password passes',
+    Validator::validate(['password' => 'longenough10'], $rules) === []);
+check('S8: absent password passes (auto-generate path)',
+    Validator::validate([], $rules) === []);
+
 echo "\n{$tests} checks, {$failures} failure(s)\n";
 exit($failures === 0 ? 0 : 1);

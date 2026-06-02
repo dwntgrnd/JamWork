@@ -29,6 +29,7 @@ class AdminRoutes
                 $errors = Validator::validate($data, [
                     'email' => 'required|email',
                     'displayName' => 'required|min:1|max:100',
+                    'password' => 'optional|min:10',
                 ]);
 
                 if (!empty($errors)) {
