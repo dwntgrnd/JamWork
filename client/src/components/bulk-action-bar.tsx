@@ -1,8 +1,9 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Task, Sprint } from '@/types';
-import { apiGet, apiPut, apiPost, getErrorMessage } from '@/lib/api';
+import { apiPut, apiPost, getErrorMessage } from '@/lib/api';
 import { invalidateProjects } from '@/hooks/use-projects';
+import { useSprints } from '@/hooks/use-sprints';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,25 +40,10 @@ export function BulkActionBar({
 }: BulkActionBarProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSprintPicker, setShowSprintPicker] = useState(false);
-  const [sprints, setSprints] = useState<Sprint[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
 
-  useEffect(() => {
-    fetchSprints();
-  }, [projectId]);
-
-  const fetchSprints = async () => {
-    try {
-      const params = new URLSearchParams();
-      if (projectId) {
-        params.append('projectId', projectId);
-      }
-      const data = await apiGet<{ sprints: Sprint[] }>(`/sprints?${params.toString()}`);
-      setSprints(data.sprints.filter(s => s.status === 'active'));
-    } catch (err) {
-      console.error('Failed to fetch sprints:', err);
-    }
-  };
+  const { data: allSprints = [] } = useSprints({ projectId });
+  const sprints = allSprints.filter((s) => s.status === 'active');
 
   const handleMarkAsDone = async () => {
     setIsExecuting(true);
