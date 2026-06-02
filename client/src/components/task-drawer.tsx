@@ -1,6 +1,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { apiGet, apiPost, apiPut, apiDelete, getErrorMessage } from '@/lib/api';
+import { invalidateProjects } from '@/hooks/use-projects';
 import {
   Task,
   Project,
@@ -224,7 +225,7 @@ export function TaskDrawer({
       try {
         await saveField('status', newStatus);
         // Status changes alter a project's open-task count — refresh the sidebar badge.
-        window.dispatchEvent(new Event('projects-updated'));
+        invalidateProjects();
       } catch {
         setStatus(prev); // revert on failure
       }
@@ -367,7 +368,7 @@ export function TaskDrawer({
       }
       setNewProjectName('');
       setShowNewProjectForm(false);
-      window.dispatchEvent(new Event('projects-updated'));
+      invalidateProjects();
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to create project'));
     } finally {
@@ -432,7 +433,7 @@ export function TaskDrawer({
       }
 
       setSaved(true);
-      window.dispatchEvent(new Event('projects-updated'));
+      invalidateProjects();
       setTimeout(() => {
         onSave();
       }, 1000);
@@ -447,7 +448,7 @@ export function TaskDrawer({
 
     try {
       await apiDelete(`/tasks/${task.id}`);
-      window.dispatchEvent(new Event('projects-updated'));
+      invalidateProjects();
       onSave();
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to delete task'));

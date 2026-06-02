@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Sun, Moon, Menu, X, LogOut, Settings, Shield } from 'lucide-react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router';
-import { apiGet } from '@/lib/api';
+import { useWorkspaceName } from '@/hooks/use-workspace-name';
 
 export default function ProtectedLayout() {
   const { user, logout } = useAuth();
@@ -26,7 +26,7 @@ export default function ProtectedLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
-  const [workspaceName, setWorkspaceName] = useState('JamWork');
+  const workspaceName = useWorkspaceName();
 
   const handleLogout = async () => {
     await logout();
@@ -35,28 +35,6 @@ export default function ProtectedLayout() {
 
   const projectIdMatch = pathname.match(/\/projects\/([^/]+)/);
   const currentProjectId = projectIdMatch ? projectIdMatch[1] : null;
-
-  useEffect(() => {
-    const fetchWorkspaceName = async () => {
-      try {
-        const response = await apiGet<{ workspaceName: string }>('/workspace-settings');
-        setWorkspaceName(response.workspaceName);
-      } catch (error) {
-        console.error('Failed to fetch workspace name:', error);
-      }
-    };
-    fetchWorkspaceName();
-  }, []);
-
-  useEffect(() => {
-    const handleWorkspaceUpdate = (e: CustomEvent<{ name: string }>) => {
-      setWorkspaceName(e.detail.name);
-    };
-    window.addEventListener('workspace-name-updated', handleWorkspaceUpdate as EventListener);
-    return () => {
-      window.removeEventListener('workspace-name-updated', handleWorkspaceUpdate as EventListener);
-    };
-  }, []);
 
   useEffect(() => {
     document.title = workspaceName || 'JamWork';

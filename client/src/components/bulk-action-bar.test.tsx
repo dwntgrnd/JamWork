@@ -3,6 +3,7 @@ import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BulkActionBar } from '@/components/bulk-action-bar'
 import { apiGet, apiPut } from '@/lib/api'
+import { invalidateProjects } from '@/hooks/use-projects'
 import type { Task } from '@/types'
 
 vi.mock('@/lib/api', () => ({
@@ -13,29 +14,27 @@ vi.mock('@/lib/api', () => ({
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
+// The component now refreshes project state via cache invalidation (post event-bus removal).
+vi.mock('@/hooks/use-projects', () => ({
+  invalidateProjects: vi.fn(),
+}))
 
 const mockedApiGet = apiGet as ReturnType<typeof vi.fn>
 const mockedApiPut = apiPut as ReturnType<typeof vi.fn>
+const mockedInvalidateProjects = invalidateProjects as ReturnType<typeof vi.fn>
 
 // Minimal task shape — only id/status are read by the component under test.
 const task = { id: 't1', status: 'todo' } as unknown as Task
 
 describe('BulkActionBar — Mark as Done', () => {
-  let projectsUpdated: ReturnType<typeof vi.fn>
-
   beforeEach(() => {
     mockedApiGet.mockReset().mockResolvedValue({ sprints: [] })
     mockedApiPut.mockReset().mockResolvedValue({})
-    projectsUpdated = vi.fn()
-    window.addEventListener('projects-updated', projectsUpdated)
+    mockedInvalidateProjects.mockReset()
   })
-  afterEach(() => {
-    // Always removed, even if an assertion above threw, so the spy can't leak.
-    window.removeEventListener('projects-updated', projectsUpdated)
-    cleanup()
-  })
+  afterEach(cleanup)
 
-  it('bulk-updates status to done and dispatches projects-updated', async () => {
+  it('bulk-updates status to done and invalidates the projects cache', async () => {
     const onActionComplete = vi.fn()
 
     render(
@@ -54,7 +53,7 @@ describe('BulkActionBar — Mark as Done', () => {
         taskIds: ['t1'],
         fields: { status: 'done' },
       })
-      expect(projectsUpdated).toHaveBeenCalled()
+      expect(mockedInvalidateProjects).toHaveBeenCalled()
       expect(onActionComplete).toHaveBeenCalled()
     })
   })

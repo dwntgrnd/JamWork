@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Task, Sprint } from '@/types';
 import { apiGet, apiPut, apiPost, getErrorMessage } from '@/lib/api';
+import { invalidateProjects } from '@/hooks/use-projects';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -77,7 +78,7 @@ export function BulkActionBar({
         fields: { status: 'done' },
       });
       // Status changes alter projects' open-task counts — refresh the sidebar badges.
-      window.dispatchEvent(new Event('projects-updated'));
+      invalidateProjects();
 
       toast.success(`Marked ${taskIds.length} task(s) as done`, {
         action: {
@@ -88,7 +89,7 @@ export function BulkActionBar({
               for (const [id, status] of previousStatuses.entries()) {
                 await apiPut(`/tasks/${id}`, { status });
               }
-              window.dispatchEvent(new Event('projects-updated'));
+              invalidateProjects();
               onActionComplete();
               toast.success('Undo complete');
             } catch (err) {
@@ -115,7 +116,7 @@ export function BulkActionBar({
     try {
       await apiPost('/tasks/bulk-delete', { taskIds });
       toast.success(`Deleted ${taskIds.length} task(s)`);
-      window.dispatchEvent(new Event('projects-updated'));
+      invalidateProjects();
       onActionComplete();
     } catch (err: unknown) {
       console.error('Failed to delete tasks:', err);

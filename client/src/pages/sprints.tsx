@@ -144,8 +144,6 @@ export default function GlobalSprintsPage() {
       await apiPut(`/tasks/${taskId}`, { sprintId: targetSprintId });
       // Refresh all data (both sprints and backlog) to update counts and task lists
       await fetchAllData();
-      // Emit sprints-updated event to trigger sidebar badge update
-      window.dispatchEvent(new Event('sprints-updated'));
       // Show toast confirmation
       if (targetSprintId === null) {
         toast.success('Task moved to Backlog');
@@ -227,7 +225,6 @@ export default function GlobalSprintsPage() {
       setClosingSprint(null);
       toast.success('Sprint closed successfully');
       fetchAllData();
-      window.dispatchEvent(new Event('sprints-updated'));
     } catch (err: unknown) {
       setCloseError(getErrorMessage(err, 'Failed to close sprint'));
     } finally {
@@ -273,7 +270,6 @@ export default function GlobalSprintsPage() {
       setShowCreateDialog(false);
       await fetchAllData();
       toast.success(`Sprint "${newSprintName.trim()}" created`);
-      window.dispatchEvent(new Event('sprints-updated'));
     } catch (err: unknown) {
       setCreateError(getErrorMessage(err, 'Failed to create sprint'));
     }
@@ -296,7 +292,6 @@ export default function GlobalSprintsPage() {
       });
       setShowEditDialog(false);
       await fetchAllData();
-      window.dispatchEvent(new Event('sprints-updated'));
     } catch (err: unknown) {
       setEditError(getErrorMessage(err, 'Failed to update sprint'));
     }
@@ -1093,7 +1088,6 @@ export default function GlobalSprintsPage() {
                     toast.success(`Moved ${selectedTaskIds.size} task${selectedTaskIds.size > 1 ? 's' : ''} to ${sprintName}`);
                     setSelectedTaskIds(new Set());
                     await fetchAllData();
-                    window.dispatchEvent(new Event('sprints-updated'));
                   } catch (err) {
                     console.error('Bulk sprint assignment failed:', err);
                     toast.error('Failed to move tasks');
@@ -1601,7 +1595,6 @@ export default function GlobalSprintsPage() {
         onSave={() => {
           setShowTaskDrawer(false);
           fetchAllData();
-          window.dispatchEvent(new Event('sprints-updated'));
         }}
         onClose={() => setShowTaskDrawer(false)}
       />
@@ -1615,7 +1608,6 @@ export default function GlobalSprintsPage() {
         onSave={() => {
           setEditingTask(null);
           fetchAllData();
-          window.dispatchEvent(new Event('sprints-updated'));
         }}
         onClose={() => {
           setEditingTask(null);

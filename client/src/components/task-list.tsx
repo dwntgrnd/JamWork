@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, KeyboardEvent } from "react";
 import { apiGet, apiPut, apiPost } from "@/lib/api";
+import { invalidateProjects } from "@/hooks/use-projects";
 import {
   Task,
   TaskAssignee,
@@ -347,7 +348,7 @@ export function TaskList({
 
       // Status changes alter a project's open-task count — refresh the sidebar badge.
       if (field === "status") {
-        window.dispatchEvent(new Event('projects-updated'));
+        invalidateProjects();
       }
 
       // If a recurring task was marked done and cloned, refresh to show the new task
@@ -531,7 +532,7 @@ export function TaskList({
 
       // Replace optimistic task with real task
       setTasks((prev) => prev.map((t) => (t.id === tempId ? result.task : t)));
-      window.dispatchEvent(new Event('projects-updated'));
+      invalidateProjects();
     } catch (err) {
       console.error("Failed to create task:", err);
       // Remove optimistic task on error
