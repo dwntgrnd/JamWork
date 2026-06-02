@@ -49,5 +49,13 @@ check('S8: valid provided password passes',
 check('S8: absent password passes (auto-generate path)',
     Validator::validate([], $rules) === []);
 
+echo "S6 — constant-time login dummy hash\n";
+
+$info = password_get_info(Auth::DUMMY_PASSWORD_HASH);
+check('S6: DUMMY_PASSWORD_HASH is a valid bcrypt hash',
+    $info['algoName'] === 'bcrypt');
+check('S6: dummy hash never verifies a real attempt',
+    Auth::verifyPassword('any-attempt', Auth::DUMMY_PASSWORD_HASH) === false);
+
 echo "\n{$tests} checks, {$failures} failure(s)\n";
 exit($failures === 0 ? 0 : 1);

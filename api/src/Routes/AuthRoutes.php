@@ -275,14 +275,24 @@ class AuthRoutes
                 $stmt->execute(['email' => $email]);
                 $user = $stmt->fetch();
 
-                // Same error for missing user and wrong password (prevent enumeration)
-                if (!$user || !Auth::verifyPassword($data['password'], $user['password_hash'])) {
+                // Same error for missing user and wrong password (prevent enumeration).
+                $invalidCredentials = function () use ($response) {
                     $response->getBody()->write(json_encode([
                         'error' => 'Invalid email or password',
                     ]));
                     return $response
                         ->withHeader('Content-Type', 'application/json')
                         ->withStatus(401);
+                };
+
+                if (!$user) {
+                    // Constant-time: a missing user costs the same bcrypt verify as a wrong password (S6).
+                    Auth::verifyPassword($data['password'], Auth::DUMMY_PASSWORD_HASH);
+                    return $invalidCredentials();
+                }
+
+                if (!Auth::verifyPassword($data['password'], $user['password_hash'])) {
+                    return $invalidCredentials();
                 }
 
                 $response = Auth::setAuthCookie($response, $user['id'], $user['role']);

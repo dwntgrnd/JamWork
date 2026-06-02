@@ -11,6 +11,13 @@ class Auth
     private const COOKIE_NAME = 'token';
     private const COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
 
+    /**
+     * A fixed, valid bcrypt hash used to run a constant-time dummy verify when
+     * a login email doesn't exist, so "no such user" costs the same as "wrong
+     * password" (audit S6). It is not a credential for any account.
+     */
+    public const DUMMY_PASSWORD_HASH = '$2y$12$ckGpi7FjNYZxp/wqFPZP1e3r9P.2MkUjLtD0q2e0YAIjaaJQDfPWq';
+
     public static function generateToken(string $userId, string $role): string
     {
         $secret = $_ENV['JWT_SECRET'];
