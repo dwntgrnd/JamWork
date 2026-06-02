@@ -27,7 +27,7 @@ class RateLimitMiddleware implements MiddlewareInterface
 
     public static function loginLimiter(): self
     {
-        return new self(20, 900); // 10 requests per 15 minutes
+        return new self(20, 900); // 20 requests per 15 minutes
     }
 
     public static function generalLimiter(): self
@@ -35,9 +35,36 @@ class RateLimitMiddleware implements MiddlewareInterface
         return new self(1000, 900); // 1000 requests per 15 minutes
     }
 
+    /**
+     * Resolve the client IP for rate-limit keying.
+     *
+     * Default: REMOTE_ADDR. When RATE_LIMIT_TRUSTED_PROXY is enabled, take the
+     * RIGHT-MOST X-Forwarded-For entry — the hop a single trusted reverse proxy
+     * appends — since earlier entries are attacker-controllable (audit S4).
+     */
+    public static function resolveClientIp(array $serverParams, ?string $forwardedFor, bool $trustProxy): string
+    {
+        if ($trustProxy && $forwardedFor !== null && trim($forwardedFor) !== '') {
+            $parts = array_values(array_filter(
+                array_map('trim', explode(',', $forwardedFor)),
+                fn($p) => $p !== ''
+            ));
+            if (!empty($parts)) {
+                return end($parts);
+            }
+        }
+        return $serverParams['REMOTE_ADDR'] ?? '127.0.0.1';
+    }
+
     public function process(Request $request, RequestHandler $handler): Response
     {
-        $ip = $request->getServerParams()['REMOTE_ADDR'] ?? '127.0.0.1';
+        $trustProxy = filter_var($_ENV['RATE_LIMIT_TRUSTED_PROXY'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $forwardedFor = $request->getHeaderLine('X-Forwarded-For');
+        $ip = self::resolveClientIp(
+            $request->getServerParams(),
+            $forwardedFor === '' ? null : $forwardedFor,
+            $trustProxy
+        );
         $key = hash('sha256', $ip);
         $file = $this->storageDir . '/' . $key . '.json';
 

@@ -57,5 +57,19 @@ check('S6: DUMMY_PASSWORD_HASH is a valid bcrypt hash',
 check('S6: dummy hash never verifies a real attempt',
     Auth::verifyPassword('any-attempt', Auth::DUMMY_PASSWORD_HASH) === false);
 
+echo "S4 — client IP resolution\n";
+
+$server = ['REMOTE_ADDR' => '10.0.0.5'];
+check('S4: proxy off → REMOTE_ADDR',
+    RateLimitMiddleware::resolveClientIp($server, '1.2.3.4', false) === '10.0.0.5');
+check('S4: proxy on → right-most XFF entry',
+    RateLimitMiddleware::resolveClientIp($server, '1.2.3.4, 5.6.7.8', true) === '5.6.7.8');
+check('S4: proxy on, single XFF entry',
+    RateLimitMiddleware::resolveClientIp($server, '203.0.113.9', true) === '203.0.113.9');
+check('S4: proxy on but empty XFF → REMOTE_ADDR',
+    RateLimitMiddleware::resolveClientIp($server, '', true) === '10.0.0.5');
+check('S4: proxy on, null XFF → REMOTE_ADDR',
+    RateLimitMiddleware::resolveClientIp($server, null, true) === '10.0.0.5');
+
 echo "\n{$tests} checks, {$failures} failure(s)\n";
 exit($failures === 0 ? 0 : 1);
