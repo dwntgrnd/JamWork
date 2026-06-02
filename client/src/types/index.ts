@@ -41,7 +41,7 @@ export interface User {
 // User summary for relations
 export interface UserSummary {
   id: string;
-  email: string;
+  email?: string;
   displayName: string;
   role: UserRole;
 }

@@ -161,7 +161,7 @@ class AuthRoutes
                 // Update password
                 $passwordHash = Auth::hashPassword($data['newPassword']);
                 $stmt = $db->prepare(
-                    'UPDATE users SET password_hash = :hash, must_reset_password = 0 WHERE id = :id'
+                    'UPDATE users SET password_hash = :hash, must_reset_password = 0, token_version = token_version + 1 WHERE id = :id'
                 );
                 $stmt->execute(['hash' => $passwordHash, 'id' => $matchedToken['user_id']]);
 
@@ -237,7 +237,7 @@ class AuthRoutes
                     throw $e;
                 }
 
-                $response = Auth::setAuthCookie($response, $userId, 'admin');
+                $response = Auth::setAuthCookie($response, $userId, 'admin', 0);
                 $response->getBody()->write(json_encode([
                     'user' => [
                         'id' => $userId,
@@ -275,17 +275,27 @@ class AuthRoutes
                 $stmt->execute(['email' => $email]);
                 $user = $stmt->fetch();
 
-                // Same error for missing user and wrong password (prevent enumeration)
-                if (!$user || !Auth::verifyPassword($data['password'], $user['password_hash'])) {
+                // Same error for missing user and wrong password (prevent enumeration).
+                $invalidCredentials = function () use ($response) {
                     $response->getBody()->write(json_encode([
                         'error' => 'Invalid email or password',
                     ]));
                     return $response
                         ->withHeader('Content-Type', 'application/json')
                         ->withStatus(401);
+                };
+
+                if (!$user) {
+                    // Constant-time: a missing user costs the same bcrypt verify as a wrong password (S6).
+                    Auth::verifyPassword($data['password'], Auth::DUMMY_PASSWORD_HASH);
+                    return $invalidCredentials();
                 }
 
-                $response = Auth::setAuthCookie($response, $user['id'], $user['role']);
+                if (!Auth::verifyPassword($data['password'], $user['password_hash'])) {
+                    return $invalidCredentials();
+                }
+
+                $response = Auth::setAuthCookie($response, $user['id'], $user['role'], (int) $user['token_version']);
                 $response->getBody()->write(json_encode([
                     'user' => [
                         'id' => $user['id'],
@@ -380,7 +390,7 @@ class AuthRoutes
                 }
 
                 $passwordHash = Auth::hashPassword($data['newPassword']);
-                $stmt = $db->prepare('UPDATE users SET password_hash = :hash, must_reset_password = 0 WHERE id = :id');
+                $stmt = $db->prepare('UPDATE users SET password_hash = :hash, must_reset_password = 0, token_version = token_version + 1 WHERE id = :id');
                 $stmt->execute(['hash' => $passwordHash, 'id' => $userId]);
 
                 $response->getBody()->write(json_encode(['message' => 'Password reset successfully']));
@@ -497,7 +507,7 @@ class AuthRoutes
 
                 $db = Database::getInstance();
 
-                $stmt = $db->prepare('SELECT id, password_hash FROM users WHERE id = :id');
+                $stmt = $db->prepare('SELECT id, password_hash, token_version FROM users WHERE id = :id');
                 $stmt->execute(['id' => $userId]);
                 $user = $stmt->fetch();
 
@@ -516,8 +526,13 @@ class AuthRoutes
                 }
 
                 $passwordHash = Auth::hashPassword($data['newPassword']);
-                $stmt = $db->prepare('UPDATE users SET password_hash = :hash WHERE id = :id');
+                $stmt = $db->prepare('UPDATE users SET password_hash = :hash, token_version = token_version + 1 WHERE id = :id');
                 $stmt->execute(['hash' => $passwordHash, 'id' => $userId]);
+
+                // Keep THIS session valid by re-issuing a cookie with the new token_version;
+                // the user's other sessions (old tv) are now invalidated (audit S3).
+                $newTokenVersion = (int) $user['token_version'] + 1;
+                $response = Auth::setAuthCookie($response, $userId, $request->getAttribute('role'), $newTokenVersion);
 
                 $response->getBody()->write(json_encode(['message' => 'Password changed successfully']));
                 return $response
@@ -528,18 +543,24 @@ class AuthRoutes
             // GET /auth/users
             $group->get('/users', function (Request $request, Response $response) {
                 $db = Database::getInstance();
+                $isAdmin = $request->getAttribute('role') === 'admin';
 
                 $stmt = $db->query('SELECT id, email, display_name, role, created_at FROM users ORDER BY created_at ASC');
                 $users = $stmt->fetchAll();
 
-                // Map to camelCase response
-                $mapped = array_map(fn($u) => [
-                    'id' => $u['id'],
-                    'email' => $u['email'],
-                    'displayName' => $u['display_name'],
-                    'role' => $u['role'],
-                    'createdAt' => date('c', strtotime($u['created_at'])),
-                ], $users);
+                // Non-admins receive only id/displayName/role (no email roster) — audit S7.
+                $mapped = array_map(function ($u) use ($isAdmin) {
+                    $entry = [
+                        'id' => $u['id'],
+                        'displayName' => $u['display_name'],
+                        'role' => $u['role'],
+                    ];
+                    if ($isAdmin) {
+                        $entry['email'] = $u['email'];
+                        $entry['createdAt'] = date('c', strtotime($u['created_at']));
+                    }
+                    return $entry;
+                }, $users);
 
                 $response->getBody()->write(json_encode(['users' => $mapped]));
                 return $response

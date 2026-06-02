@@ -41,6 +41,31 @@ class Mailer
             && !empty($_ENV['SMTP_FROM_EMAIL']);
     }
 
+    /**
+     * Fill the invite template, HTML-escaping every interpolated value
+     * (workspace name included — see audit S9).
+     */
+    public static function renderInviteBody(
+        string $template,
+        string $workspaceName,
+        string $displayName,
+        string $email,
+        string $temporaryPassword,
+        string $loginUrl
+    ): string {
+        return str_replace(
+            ['{{WORKSPACE_NAME}}', '{{DISPLAY_NAME}}', '{{EMAIL}}', '{{TEMPORARY_PASSWORD}}', '{{LOGIN_URL}}'],
+            [
+                htmlspecialchars($workspaceName),
+                htmlspecialchars($displayName),
+                htmlspecialchars($email),
+                htmlspecialchars($temporaryPassword),
+                htmlspecialchars($loginUrl),
+            ],
+            $template
+        );
+    }
+
     public function sendInviteEmail(
         string $toEmail,
         string $displayName,
@@ -55,11 +80,7 @@ class Mailer
             $templatePath = __DIR__ . '/../Mail/templates/invite.html';
             $html = file_get_contents($templatePath);
 
-            $html = str_replace(
-                ['{{WORKSPACE_NAME}}', '{{DISPLAY_NAME}}', '{{EMAIL}}', '{{TEMPORARY_PASSWORD}}', '{{LOGIN_URL}}'],
-                [$workspaceName, htmlspecialchars($displayName), htmlspecialchars($toEmail), htmlspecialchars($temporaryPassword), htmlspecialchars($loginUrl)],
-                $html
-            );
+            $html = self::renderInviteBody($html, $workspaceName, $displayName, $toEmail, $temporaryPassword, $loginUrl);
 
             $this->mail->Body = $html;
             $this->mail->AltBody = "Hi {$displayName},\n\n"

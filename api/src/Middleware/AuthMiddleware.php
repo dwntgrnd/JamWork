@@ -3,6 +3,7 @@
 namespace JamWork\Middleware;
 
 use JamWork\Lib\Auth;
+use JamWork\Lib\Database;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\MiddlewareInterface;
@@ -28,6 +29,17 @@ class AuthMiddleware implements MiddlewareInterface
             return $this->unauthorized('Session expired. Please log in again.');
         }
 
+        // S3: reject tokens whose version is stale, or whose user no longer exists.
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT token_version FROM users WHERE id = :id');
+        $stmt->execute(['id' => $payload['userId']]);
+        $row = $stmt->fetch();
+
+        if (!$row || !Auth::tokenVersionMatches($payload['tv'] ?? null, (int) $row['token_version'])) {
+            return $this->unauthorized('Session expired. Please log in again.');
+        }
+        $dbTokenVersion = (int) $row['token_version'];
+
         // Attach user info to request
         $request = $request
             ->withAttribute('userId', $payload['userId'])
@@ -35,10 +47,10 @@ class AuthMiddleware implements MiddlewareInterface
 
         $response = $handler->handle($request);
 
-        // Sliding session: refresh if token is older than 24 hours
+        // Sliding session: refresh if token is older than 24 hours (preserve tv).
         $tokenAge = time() - ($payload['iat'] ?? time());
         if ($tokenAge > self::TOKEN_REFRESH_THRESHOLD) {
-            $response = Auth::setAuthCookie($response, $payload['userId'], $payload['role']);
+            $response = Auth::setAuthCookie($response, $payload['userId'], $payload['role'], $dbTokenVersion);
         }
 
         return $response;
