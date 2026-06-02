@@ -28,11 +28,8 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress
 
-      - name: Run notification decision tests
-        run: php tests/NotificationServiceTest.php
-
-      - name: Run security hardening tests
-        run: php tests/SecurityHardeningTest.php
+      - name: Run PHPUnit
+        run: vendor/bin/phpunit
 
       - name: Security audit (fails on known advisories)
         run: composer audit
