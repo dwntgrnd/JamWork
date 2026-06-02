@@ -23,16 +23,6 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -41,21 +31,15 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import {
-  Check,
-  X,
-  Plus,
-  Loader2,
-  ExternalLink,
-  Link as LinkIcon,
-  Trash2,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Check, Loader2, Trash2 } from 'lucide-react';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { SaveStatusIndicator } from '@/components/save-status-indicator';
+import { AssigneeSelector } from '@/components/assignee-selector';
+import { SubtaskList } from '@/components/subtask-list';
+import { TaskLinksSection } from '@/components/task-links-section';
+import { ProjectSelector } from '@/components/project-selector';
+import { DeleteConfirmDialog, UnsavedChangesDialog } from '@/components/task-drawer-dialogs';
 
 interface TaskDrawerProps {
   mode: 'create' | 'edit';
@@ -498,15 +482,6 @@ export function TaskDrawer({
     }
   };
 
-  // Link handlers
-  const getDomain = (url: string): string => {
-    try {
-      return new URL(url).hostname.replace('www.', '');
-    } catch {
-      return url;
-    }
-  };
-
   const handleAddLink = async () => {
     if (!task || !newLinkUrl.trim()) return;
     // Client-side validation
@@ -539,8 +514,6 @@ export function TaskDrawer({
       setError(getErrorMessage(err, 'Failed to delete link'));
     }
   };
-
-  const completedSubtasksCount = subtasks.filter((s) => s.completed).length;
 
   return (
     <>
@@ -739,82 +712,27 @@ export function TaskDrawer({
 
                     {/* Project */}
                     {(mode === 'edit' || (mode === 'create' && !initialProjectId)) && (
-                      <div className="bg-field-bg rounded-md border border-field-border p-2">
-                        <span className="text-[11px] text-muted-foreground uppercase tracking-wider">
-                          Project {mode === 'create' && !initialProjectId && <span className="text-destructive">*</span>}
-                        </span>
-                        <Select
-                          value={projectId}
-                          onValueChange={(v) => {
-                            if (v === '__new__') {
-                              setShowNewProjectForm(true);
-                            } else {
-                              handleProjectChange(v);
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
-                            <SelectValue placeholder="Select project" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {projects.map((project) => (
-                              <SelectItem key={project.id} value={project.id}>
-                                {project.name}
-                              </SelectItem>
-                            ))}
-                            <SelectItem value="__new__" className="text-interactive font-medium">
-                              <Plus className="h-3 w-3 inline mr-1" />
-                              New Project
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {showNewProjectForm && (
-                          <div className="flex items-center gap-2 mt-1">
-                            <Input
-                              placeholder="Project name"
-                              value={newProjectName}
-                              onChange={(e) => setNewProjectName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleCreateProject();
-                                }
-                                if (e.key === 'Escape') {
-                                  setShowNewProjectForm(false);
-                                  setNewProjectName('');
-                                }
-                              }}
-                              className="flex-1 h-8 text-sm"
-                              autoFocus
-                              disabled={creatingProject}
-                            />
-                            <Button
-                              size="sm"
-                              className="h-8"
-                              onClick={handleCreateProject}
-                              disabled={!newProjectName.trim() || creatingProject}
-                            >
-                              {creatingProject ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                'Save'
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8"
-                              onClick={() => {
-                                setShowNewProjectForm(false);
-                                setNewProjectName('');
-                              }}
-                              disabled={creatingProject}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
+                      <ProjectSelector
+                        projectId={projectId}
+                        projects={projects}
+                        required={mode === 'create' && !initialProjectId}
+                        onValueChange={(v) => {
+                          if (v === '__new__') {
+                            setShowNewProjectForm(true);
+                          } else {
+                            handleProjectChange(v);
+                          }
+                        }}
+                        showNewProjectForm={showNewProjectForm}
+                        newProjectName={newProjectName}
+                        onNewProjectNameChange={setNewProjectName}
+                        creatingProject={creatingProject}
+                        onCreateProject={handleCreateProject}
+                        onCancelNewProject={() => {
+                          setShowNewProjectForm(false);
+                          setNewProjectName('');
+                        }}
+                      />
                     )}
                 </div>
               </div>
@@ -837,183 +755,50 @@ export function TaskDrawer({
               </div>
 
               {/* === ASSIGNEES — own section === */}
-              <div>
-                <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Assignees</h3>
-                <div className="flex flex-wrap gap-2">
-                  {users.map((user) => (
-                    <Badge
-                      key={user.id}
-                      variant={
-                        selectedAssignees.includes(user.id) ? 'default' : 'outline'
-                      }
-                      className="cursor-pointer text-sm font-medium"
-                      onClick={() => handleToggleAssignee(user.id)}
-                    >
-                      {selectedAssignees.includes(user.id) && (
-                        <Check className="h-3 w-3 mr-1" />
-                      )}
-                      {user.displayName}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+              <AssigneeSelector
+                users={users}
+                selectedAssignees={selectedAssignees}
+                onToggle={handleToggleAssignee}
+              />
 
               {/* === SUBTASKS & LINKS === */}
               <div className="space-y-3">
                 {/* Subtasks (edit mode only) */}
                 {mode === 'edit' && task && (
-                  <>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[13px] text-muted-foreground">Subtasks</span>
-                        {subtasks.length > 0 && (
-                          <Badge variant="secondary" className="text-xs">
-                            {completedSubtasksCount}/{subtasks.length} complete
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* Subtask list */}
-                      <div className="space-y-2">
-                        {subtasks.map((subtask) => (
-                          <div
-                            key={subtask.id}
-                            className="flex items-center gap-2 group"
-                          >
-                            <Checkbox
-                              checked={subtask.completed}
-                              onCheckedChange={() => handleToggleSubtask(subtask)}
-                            />
-                            <span
-                              className={cn(
-                                'flex-1 text-sm',
-                                subtask.completed && 'line-through text-muted-foreground'
-                              )}
-                            >
-                              {subtask.title}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteSubtask(subtask.id)}
-                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Add subtask */}
-                      <div className="flex items-center gap-2 mt-2 border-b border-dashed border-field-border pb-1">
-                        <Plus className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-                        <Input
-                          placeholder="Add a subtask..."
-                          value={newSubtaskTitle}
-                          onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAddSubtask();
-                            }
-                          }}
-                          className="flex-1 h-8 text-sm border-none shadow-none focus-visible:ring-0 bg-transparent placeholder:text-muted-foreground/50"
-                        />
-                      </div>
-                    </div>
-                  </>
+                  <SubtaskList
+                    subtasks={subtasks}
+                    newSubtaskTitle={newSubtaskTitle}
+                    onNewSubtaskTitleChange={setNewSubtaskTitle}
+                    onAdd={handleAddSubtask}
+                    onToggle={handleToggleSubtask}
+                    onDelete={handleDeleteSubtask}
+                  />
                 )}
               </div>
 
               {/* === RELATED ITEMS GROUP === */}
               {mode === 'edit' && task && (
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Links</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs"
-                      onClick={() => setShowAddLink(!showAddLink)}
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add
-                    </Button>
-                  </div>
-
-                  {/* Add link form */}
-                  {showAddLink && (
-                    <div className="space-y-2 p-3 border rounded-md bg-muted/30">
-                      <Input
-                        placeholder="https://example.com"
-                        value={newLinkUrl}
-                        onChange={(e) => { setNewLinkUrl(e.target.value); setLinkError(''); }}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddLink(); } }}
-                        className="h-8 text-sm"
-                      />
-                      <Input
-                        placeholder="Link title (optional)"
-                        value={newLinkTitle}
-                        onChange={(e) => setNewLinkTitle(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddLink(); } }}
-                        className="h-8 text-sm"
-                      />
-                      {linkError && (
-                        <p className="text-xs text-destructive">{linkError}</p>
-                      )}
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setShowAddLink(false); setNewLinkUrl(''); setNewLinkTitle(''); setLinkError(''); }}>
-                          Cancel
-                        </Button>
-                        <Button size="sm" className="h-7 text-xs" onClick={handleAddLink}>
-                          Add Link
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Link rows */}
-                  {links.length > 0 && (
-                    <div className="space-y-1">
-                      {links.map((link) => (
-                        <div
-                          key={link.id}
-                          className="flex items-center gap-2 group py-1.5 px-2 rounded-md hover:bg-muted/50 transition-colors"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          <a
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-primary hover:underline truncate flex-1"
-                            title={link.url}
-                          >
-                            {link.title || getDomain(link.url)}
-                          </a>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                            onClick={() => handleDeleteLink(link.id)}
-                          >
-                            <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Empty state when no links and form not showing */}
-                  {links.length === 0 && !showAddLink && (
-                    <div
-                      className="flex items-center gap-2 border-b border-dashed border-field-border pb-1 cursor-pointer"
-                      onClick={() => setShowAddLink(true)}
-                    >
-                      <LinkIcon className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-                      <span className="text-sm text-muted-foreground/50">Add a link...</span>
-                    </div>
-                  )}
-                </div>
+                <TaskLinksSection
+                  links={links}
+                  showAddLink={showAddLink}
+                  onShowAddLinkChange={setShowAddLink}
+                  newLinkUrl={newLinkUrl}
+                  onNewLinkUrlChange={(v) => {
+                    setNewLinkUrl(v);
+                    setLinkError('');
+                  }}
+                  newLinkTitle={newLinkTitle}
+                  onNewLinkTitleChange={setNewLinkTitle}
+                  linkError={linkError}
+                  onAdd={handleAddLink}
+                  onCancelAdd={() => {
+                    setShowAddLink(false);
+                    setNewLinkUrl('');
+                    setNewLinkTitle('');
+                    setLinkError('');
+                  }}
+                  onDelete={handleDeleteLink}
+                />
               )}
 
               {/* Error message */}
@@ -1077,44 +862,17 @@ export function TaskDrawer({
         </SheetContent>
       </Sheet>
 
-      {/* Delete confirmation */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Task?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This task will be deleted and removed from all views. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive hover:bg-destructive/90 text-white"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={handleDelete}
+      />
 
-      {/* Unsaved changes confirmation (create mode only) */}
-      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have unsaved changes. Are you sure you want to close? Your changes will be lost.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep Editing</AlertDialogCancel>
-            <AlertDialogAction onClick={onClose}>
-              Discard Changes
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <UnsavedChangesDialog
+        open={showUnsavedDialog}
+        onOpenChange={setShowUnsavedDialog}
+        onDiscard={onClose}
+      />
     </>
   );
 }
