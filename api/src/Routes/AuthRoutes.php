@@ -538,18 +538,24 @@ class AuthRoutes
             // GET /auth/users
             $group->get('/users', function (Request $request, Response $response) {
                 $db = Database::getInstance();
+                $isAdmin = $request->getAttribute('role') === 'admin';
 
                 $stmt = $db->query('SELECT id, email, display_name, role, created_at FROM users ORDER BY created_at ASC');
                 $users = $stmt->fetchAll();
 
-                // Map to camelCase response
-                $mapped = array_map(fn($u) => [
-                    'id' => $u['id'],
-                    'email' => $u['email'],
-                    'displayName' => $u['display_name'],
-                    'role' => $u['role'],
-                    'createdAt' => date('c', strtotime($u['created_at'])),
-                ], $users);
+                // Non-admins receive only id/displayName/role (no email roster) — audit S7.
+                $mapped = array_map(function ($u) use ($isAdmin) {
+                    $entry = [
+                        'id' => $u['id'],
+                        'displayName' => $u['display_name'],
+                        'role' => $u['role'],
+                    ];
+                    if ($isAdmin) {
+                        $entry['email'] = $u['email'];
+                        $entry['createdAt'] = date('c', strtotime($u['created_at']));
+                    }
+                    return $entry;
+                }, $users);
 
                 $response->getBody()->write(json_encode(['users' => $mapped]));
                 return $response
