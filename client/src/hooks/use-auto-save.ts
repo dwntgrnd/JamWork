@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { apiPut } from "@/lib/api";
+import { apiPut, getErrorMessage } from "@/lib/api";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -9,7 +9,7 @@ interface UseAutoSaveOptions {
 }
 
 interface UseAutoSaveReturn {
-  saveField: (fieldName: string, value: any) => Promise<void>;
+  saveField: (fieldName: string, value: unknown) => Promise<void>;
   status: SaveStatus;
   error: string | null;
   clearError: () => void;
@@ -37,7 +37,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
   }, []);
 
   const saveField = useCallback(
-    async (fieldName: string, value: any) => {
+    async (fieldName: string, value: unknown) => {
       // No-op if not enabled (create mode)
       if (!enabled) {
         return;
@@ -63,9 +63,9 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
           setStatus("idle");
           savedTimerRef.current = null;
         }, 2000);
-      } catch (err: any) {
+      } catch (err: unknown) {
         // Error: set error status and store message
-        const errorMessage = err.message || "Failed to save";
+        const errorMessage = getErrorMessage(err, "Failed to save");
         setStatus("error");
         setError(errorMessage);
 

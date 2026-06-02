@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { Task, Sprint } from '@/types';
-import { apiGet, apiPut, apiPost } from '@/lib/api';
+import { apiGet, apiPut, apiPost, getErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,8 +19,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { CheckCircle2, Trash2, ArrowRightCircle, Inbox, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { CheckCircle2, Trash2, ArrowRightCircle, Inbox } from 'lucide-react';
 
 interface BulkActionBarProps {
   selectedTaskIds: Set<string>;
@@ -101,9 +100,9 @@ export function BulkActionBar({
       });
 
       onActionComplete();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to mark tasks as done:', err);
-      toast.error(err.message || 'Failed to update tasks');
+      toast.error(getErrorMessage(err, 'Failed to update tasks'));
     } finally {
       setIsExecuting(false);
     }
@@ -118,9 +117,9 @@ export function BulkActionBar({
       toast.success(`Deleted ${taskIds.length} task(s)`);
       window.dispatchEvent(new Event('projects-updated'));
       onActionComplete();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to delete tasks:', err);
-      toast.error(err.message || 'Failed to delete tasks');
+      toast.error(getErrorMessage(err, 'Failed to delete tasks'));
     } finally {
       setIsExecuting(false);
       setShowDeleteConfirm(false);
@@ -140,9 +139,9 @@ export function BulkActionBar({
 
       toast.success(`Moved ${taskIds.length} task(s) to ${sprint?.name || 'sprint'}`);
       onActionComplete();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to move tasks to sprint:', err);
-      toast.error(err.message || 'Failed to move tasks');
+      toast.error(getErrorMessage(err, 'Failed to move tasks'));
     } finally {
       setIsExecuting(false);
       setShowSprintPicker(false);
@@ -190,9 +189,9 @@ export function BulkActionBar({
       });
 
       onActionComplete();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to move tasks to backlog:', err);
-      toast.error(err.message || 'Failed to move tasks');
+      toast.error(getErrorMessage(err, 'Failed to move tasks'));
     } finally {
       setIsExecuting(false);
     }

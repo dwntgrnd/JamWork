@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useAuth } from '@/hooks/use-auth';
 import { Task } from '@/types';
 import { TaskList } from '@/components/task-list';
 import { TaskFilters } from '@/components/task-filters';
@@ -10,7 +9,6 @@ import { Plus } from 'lucide-react';
 import { useFilterParams } from '@/hooks/use-filter-params';
 
 export default function MyTasksPage() {
-  const { user } = useAuth();
   const { filters, setFilters } = useFilterParams({ defaultSortBy: 'dueDate', defaultSortDir: 'asc' });
   const [showTaskDrawer, setShowTaskDrawer] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);

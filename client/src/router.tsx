@@ -15,19 +15,10 @@ import GlobalTimelinePage from './pages/timeline';
 import SprintsPage from './pages/sprints';
 import SettingsPage from './pages/settings';
 import AdminPage from './pages/admin';
+import NotFoundPage from './pages/not-found';
 import { AuthGuard } from './components/auth-guard';
-import { AuthProvider } from './hooks/use-auth';
-
-function NotFoundPage() {
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-foreground mb-2">404</h1>
-        <p className="text-muted-foreground">Page not found</p>
-      </div>
-    </div>
-  );
-}
+import { AuthProvider } from './hooks/auth-provider';
+import { ErrorBoundary } from './components/error-boundary';
 
 export const router = createBrowserRouter([
   {
@@ -52,7 +43,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/',
-    element: <AuthProvider><AuthGuard><ProtectedLayout /></AuthGuard></AuthProvider>,
+    element: <AuthProvider><AuthGuard><ErrorBoundary><ProtectedLayout /></ErrorBoundary></AuthGuard></AuthProvider>,
     children: [
       { index: true, element: <RootRedirect /> },
       { path: 'projects/:id', element: <ProjectPage /> },

@@ -1,6 +1,6 @@
 
 import { memo } from 'react';
-import { Task, TaskPriority, PRIORITY_LABELS, EFFORT_LABELS } from '@/types';
+import { Task, PRIORITY_LABELS, EFFORT_LABELS } from '@/types';
 import { cn } from '@/lib/utils';
 import { getDateUrgencyInfo } from '@/lib/date-utils';
 import { getPriorityDotColor, getEffortBadgeClasses } from '@/lib/style-tokens';

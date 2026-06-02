@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router';
-import { apiPost } from '@/lib/api';
+import { apiPost, getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -64,8 +64,8 @@ export default function SetNewPasswordPage() {
     try {
       await apiPost('/auth/set-new-password', { token, newPassword });
       navigate('/login?reset=success');
-    } catch (err: any) {
-      setError(err.message || 'Failed to reset password. The link may have expired.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to reset password. The link may have expired.'));
     } finally {
       setLoading(false);
     }

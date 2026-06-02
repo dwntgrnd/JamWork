@@ -1,12 +1,17 @@
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
-class ApiError extends Error {
+export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
     super(message);
     this.status = status;
     this.name = "ApiError";
   }
+}
+
+/** Narrow an unknown thrown value to a display message, falling back when absent. */
+export function getErrorMessage(err: unknown, fallback = "Something went wrong"): string {
+  return err instanceof Error && err.message ? err.message : fallback;
 }
 
 async function apiFetch<T>(

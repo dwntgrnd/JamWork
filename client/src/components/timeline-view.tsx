@@ -1,9 +1,9 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, memo } from 'react';
-import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
+import { apiGet, apiPost, apiPut, apiDelete, getErrorMessage } from '@/lib/api';
 import { Task, Sprint, Milestone, Project, UserSummary, STATUS_LABELS, TaskFilterState, TaskStatus } from '@/types';
 import { getPriorityDotColor } from '@/lib/style-tokens';
-import { getDateUrgencyInfo, parseLocalDate, startOfLocalDay } from '@/lib/date-utils';
+import { parseLocalDate, startOfLocalDay } from '@/lib/date-utils';
 import { Button } from '@/components/ui/button';
 import { TaskDrawer } from '@/components/task-drawer';
 import {
@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label as FormLabel } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, ChevronDown, Target, GanttChart, Diamond, Plus, Edit2, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Target, GanttChart, Diamond, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { isOverdue } from '@/lib/date-utils';
@@ -193,8 +193,8 @@ const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewP
 
       setShowMilestoneDialog(false);
       fetchData(); // Refresh all data including milestones
-    } catch (err: any) {
-      setMilestoneError(err.message || 'Failed to save milestone');
+    } catch (err: unknown) {
+      setMilestoneError(getErrorMessage(err, 'Failed to save milestone'));
     }
   };
 

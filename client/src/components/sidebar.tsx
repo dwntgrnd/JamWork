@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router';
-import { apiGet, apiPost, apiDelete } from '@/lib/api';
+import { apiGet, apiPost, apiDelete, getErrorMessage } from '@/lib/api';
 import { Project } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -115,8 +115,8 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
 
       // Navigate to new project
       navigate(`/projects/${data.project.id}`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to create project');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to create project'));
     }
   };
 

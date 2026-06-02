@@ -1,12 +1,9 @@
-import { useEffect, useState, useRef, useCallback, KeyboardEvent } from "react";
+import { useEffect, useState, useRef, KeyboardEvent } from "react";
 import { apiGet, apiPut, apiPost } from "@/lib/api";
 import {
   Task,
   TaskAssignee,
-  TaskEffort,
   TaskFilterState,
-  TaskStatus,
-  TaskPriority,
   STATUS_LABELS,
   PRIORITY_LABELS,
   EFFORT_LABELS,
@@ -52,12 +49,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDate, getDateUrgencyInfo } from "@/lib/date-utils";
+import { getDateUrgencyInfo } from "@/lib/date-utils";
 import {
   getStatusChipClasses,
   getPriorityDotColor,
   getEffortBadgeClasses,
-  getAvatarColor,
 } from "@/lib/style-tokens";
 import {
   DragDropContext,
@@ -88,7 +84,6 @@ export function TaskList({
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [focusedRowIndex, setFocusedRowIndex] = useState(-1);
   const [savingFields, setSavingFields] = useState<Set<string>>(new Set());
@@ -199,11 +194,6 @@ export function TaskList({
   const handleRefresh = () => {
     fetchTasks();
     if (onRefresh) onRefresh();
-  };
-
-  const clearSelection = () => {
-    setSelectedTaskIds(new Set());
-    setLastSelectedIndex(null);
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -397,7 +387,7 @@ export function TaskList({
           return next;
         });
       }, 2000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to save:", err);
       setSavingFields((prev) => {
         const next = new Set(prev);
@@ -517,7 +507,7 @@ export function TaskList({
                 id: user.id,
                 email: "",
                 displayName: user.displayName,
-                role: user.role as any,
+                role: user.role,
               },
             },
           ]
