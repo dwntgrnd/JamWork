@@ -161,7 +161,7 @@ class AuthRoutes
                 // Update password
                 $passwordHash = Auth::hashPassword($data['newPassword']);
                 $stmt = $db->prepare(
-                    'UPDATE users SET password_hash = :hash, must_reset_password = 0 WHERE id = :id'
+                    'UPDATE users SET password_hash = :hash, must_reset_password = 0, token_version = token_version + 1 WHERE id = :id'
                 );
                 $stmt->execute(['hash' => $passwordHash, 'id' => $matchedToken['user_id']]);
 
@@ -390,7 +390,7 @@ class AuthRoutes
                 }
 
                 $passwordHash = Auth::hashPassword($data['newPassword']);
-                $stmt = $db->prepare('UPDATE users SET password_hash = :hash, must_reset_password = 0 WHERE id = :id');
+                $stmt = $db->prepare('UPDATE users SET password_hash = :hash, must_reset_password = 0, token_version = token_version + 1 WHERE id = :id');
                 $stmt->execute(['hash' => $passwordHash, 'id' => $userId]);
 
                 $response->getBody()->write(json_encode(['message' => 'Password reset successfully']));
@@ -526,7 +526,7 @@ class AuthRoutes
                 }
 
                 $passwordHash = Auth::hashPassword($data['newPassword']);
-                $stmt = $db->prepare('UPDATE users SET password_hash = :hash WHERE id = :id');
+                $stmt = $db->prepare('UPDATE users SET password_hash = :hash, token_version = token_version + 1 WHERE id = :id');
                 $stmt->execute(['hash' => $passwordHash, 'id' => $userId]);
 
                 $response->getBody()->write(json_encode(['message' => 'Password changed successfully']));
