@@ -306,6 +306,10 @@ export default function GlobalSprintsPage() {
   const now = new Date();
   const currentSprints = activeSprints.filter((s) => new Date(s.startDate) <= now && new Date(s.endDate) >= now);
   const futureSprints = activeSprints.filter((s) => new Date(s.startDate) > now);
+  // Active sprints whose end date has passed but that were never closed. They're
+  // still assignable (the task drawer offers them); without this group they'd be
+  // dropped from the assign dropdowns entirely — neither "current" nor "upcoming".
+  const pastSprints = activeSprints.filter((s) => new Date(s.endDate) < now);
 
   // Apply filters to backlog tasks
   const filteredBacklog = backlogTasks.filter((task) => {
@@ -762,7 +766,17 @@ export default function GlobalSprintsPage() {
                       ))}
                     </>
                   )}
-                  {(currentSprints.length > 0 || futureSprints.length > 0) && (
+                  {pastSprints.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Ended</div>
+                      {pastSprints.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {(currentSprints.length > 0 || futureSprints.length > 0 || pastSprints.length > 0) && (
                     <div className="border-t border-border my-1" />
                   )}
                   <SelectItem value="__backlog__">
@@ -965,8 +979,19 @@ export default function GlobalSprintsPage() {
                               ))}
                             </>
                           )}
+                          {/* Ended - active sprints past their end date, not yet closed */}
+                          {pastSprints.length > 0 && (
+                            <>
+                              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Ended</div>
+                              {pastSprints.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  {s.name}
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
                           {/* Backlog option - always present at bottom */}
-                          {(currentSprints.length > 0 || futureSprints.length > 0) && (
+                          {(currentSprints.length > 0 || futureSprints.length > 0 || pastSprints.length > 0) && (
                             <div className="border-t border-border my-1" />
                           )}
                           <SelectItem value="__backlog__">
@@ -975,7 +1000,7 @@ export default function GlobalSprintsPage() {
                               Backlog
                             </span>
                           </SelectItem>
-                          {currentSprints.length === 0 && futureSprints.length === 0 && (
+                          {currentSprints.length === 0 && futureSprints.length === 0 && pastSprints.length === 0 && (
                             <div className="px-2 py-1 text-xs text-muted-foreground">No active sprints</div>
                           )}
                         </SelectContent>
