@@ -2,6 +2,8 @@
 
 namespace JamWork;
 
+use JamWork\Lib\DatabaseUnavailableException;
+use JamWork\Lib\DatabaseUnavailableHandler;
 use JamWork\Middleware\NoCacheMiddleware;
 use JamWork\Middleware\RateLimitMiddleware;
 use JamWork\Routes\AdminRoutes;
@@ -47,6 +49,12 @@ class Bootstrap
 
         $errorHandler = $errorMiddleware->getDefaultErrorHandler();
         $errorHandler->forceContentType('application/json');
+
+        // A DB outage is transient — answer 503 (not a raw 500) without leaking details.
+        $errorMiddleware->setErrorHandler(
+            DatabaseUnavailableException::class,
+            new DatabaseUnavailableHandler()
+        );
 
         // Routes
         $app->get('/health', function (Request $request, Response $response) {

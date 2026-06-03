@@ -371,7 +371,7 @@ class AuthRoutes
 
                 $db = Database::getInstance();
 
-                $stmt = $db->prepare('SELECT id, must_reset_password FROM users WHERE id = :id');
+                $stmt = $db->prepare('SELECT id, must_reset_password, token_version FROM users WHERE id = :id');
                 $stmt->execute(['id' => $userId]);
                 $user = $stmt->fetch();
 
@@ -392,6 +392,11 @@ class AuthRoutes
                 $passwordHash = Auth::hashPassword($data['newPassword']);
                 $stmt = $db->prepare('UPDATE users SET password_hash = :hash, must_reset_password = 0, token_version = token_version + 1 WHERE id = :id');
                 $stmt->execute(['hash' => $passwordHash, 'id' => $userId]);
+
+                // Keep THIS session valid by re-issuing a cookie with the new token_version;
+                // the user's other sessions (old tv) are now invalidated (audit S3).
+                $newTokenVersion = (int) $user['token_version'] + 1;
+                $response = Auth::setAuthCookie($response, $userId, $request->getAttribute('role'), $newTokenVersion);
 
                 $response->getBody()->write(json_encode(['message' => 'Password reset successfully']));
                 return $response

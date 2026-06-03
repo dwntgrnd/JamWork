@@ -11,6 +11,7 @@ import { TaskDrawer } from '@/components/task-drawer';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { TaskLoadError } from '@/components/task-load-error';
 import { toast } from 'sonner';
 
 interface BoardViewProps {
@@ -175,6 +176,10 @@ export function BoardView({ projectId, filters, refreshKey }: BoardViewProps) {
         ))}
       </div>
     );
+  }
+
+  if (isError) {
+    return <TaskLoadError onRetry={() => refetch()} />;
   }
 
   return (

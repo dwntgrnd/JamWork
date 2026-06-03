@@ -4,6 +4,9 @@ import { User } from '@/types';
 export interface AuthContextType {
   user: User | null;
   loading: boolean;
+  /** True when the initial session check failed for a non-auth reason (server/network
+   * down). Distinct from `user === null`, which means genuinely not authenticated. */
+  serverError: boolean;
   login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
   signup: (email: string, password: string, displayName: string) => Promise<User>;
