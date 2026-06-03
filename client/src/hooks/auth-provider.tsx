@@ -1,11 +1,12 @@
 import { useState, useEffect, ReactNode } from 'react';
-import { apiGet, apiPost, apiPut } from '@/lib/api';
+import { apiGet, apiPost, apiPut, ApiError } from '@/lib/api';
 import { User } from '@/types';
 import { AuthContext, NotificationPreferences } from './use-auth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [serverError, setServerError] = useState(false);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -13,9 +14,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const response = await apiGet<{ user: User }>('/auth/me');
         setUser(response.user);
-      } catch {
-        // Not authenticated or session expired
-        setUser(null);
+        setServerError(false);
+      } catch (err) {
+        // A 401 means genuinely not authenticated -> clear the user (the guard
+        // sends us to login). Any other failure (server/network down) is NOT a
+        // logout: flag it so the UI can show a "can't reach server" state instead
+        // of bouncing to a login page that also can't work.
+        if (err instanceof ApiError && err.status === 401) {
+          setUser(null);
+        } else {
+          setServerError(true);
+        }
       } finally {
         setLoading(false);
       }
@@ -72,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = {
     user,
     loading,
+    serverError,
     login,
     logout,
     signup,

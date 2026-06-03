@@ -15,6 +15,7 @@ import { TaskDrawer } from "@/components/task-drawer";
 import { TaskTableRow } from "@/components/task-table-row";
 import { AddTaskRow } from "@/components/add-task-row";
 import { TaskListEmptyState } from "@/components/task-list-empty";
+import { TaskLoadError } from "@/components/task-load-error";
 import {
   Table,
   TableBody,
@@ -63,7 +64,7 @@ export function TaskList({
     sortBy: filters.sortBy,
     sortDir: filters.sortDir,
   };
-  const { data: tasks = EMPTY_TASKS, isLoading: loading, refetch } = useTasks(taskParams);
+  const { data: tasks = EMPTY_TASKS, isLoading: loading, isError, refetch } = useTasks(taskParams);
   const { data: users = [] } = useUsers();
   const { data: projects = [] } = useProjects();
 
@@ -496,6 +497,10 @@ export function TaskList({
         ))}
       </div>
     );
+  }
+
+  if (isError) {
+    return <TaskLoadError onRetry={() => refetch()} />;
   }
 
   if (tasks.length === 0) {

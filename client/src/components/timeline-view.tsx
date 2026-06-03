@@ -13,6 +13,7 @@ import { TaskDrawer } from '@/components/task-drawer';
 import { TimelineHeader } from '@/components/timeline-header';
 import { MilestoneDialog } from '@/components/milestone-dialog';
 import { TimelineTaskBar } from '@/components/timeline-task-bar';
+import { TaskLoadError } from '@/components/task-load-error';
 import {
   Tooltip,
   TooltipContent,
@@ -469,6 +470,10 @@ const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewP
     return (
       <div className="p-8 text-center text-muted-foreground">Loading timeline...</div>
     );
+  }
+
+  if (tasksQuery.isError) {
+    return <TaskLoadError onRetry={() => refetchTasks()} />;
   }
 
   if (filteredTasks.length === 0 && milestones.length === 0) {
