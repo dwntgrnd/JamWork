@@ -55,6 +55,7 @@ rm -f  "$STAGE_DIR/api/.gitignore"
 # the STAGED vendor from composer.lock minus require-dev; it never touches the
 # repo's own api/vendor.
 echo "==> Installing production-only dependencies in staging..."
+rm -rf "$STAGE_DIR/api/vendor"
 ( cd "$STAGE_DIR/api" && "$COMPOSER_BIN" install --no-dev --optimize-autoloader --no-interaction --quiet )
 
 # Copy root .htaccess
