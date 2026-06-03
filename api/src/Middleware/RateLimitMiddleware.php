@@ -12,27 +12,29 @@ class RateLimitMiddleware implements MiddlewareInterface
 {
     private int $maxRequests;
     private int $windowSeconds;
+    private string $bucket;
     private string $storageDir;
 
-    public function __construct(int $maxRequests, int $windowSeconds)
+    public function __construct(int $maxRequests, int $windowSeconds, string $bucket = 'default', ?string $storageDir = null)
     {
         $this->maxRequests = $maxRequests;
         $this->windowSeconds = $windowSeconds;
-        $this->storageDir = sys_get_temp_dir() . '/jamwork_ratelimit';
+        $this->bucket = $bucket;
+        $this->storageDir = $storageDir ?? sys_get_temp_dir() . '/jamwork_ratelimit';
 
         if (!is_dir($this->storageDir)) {
             @mkdir($this->storageDir, 0755, true);
         }
     }
 
-    public static function loginLimiter(): self
+    public static function loginLimiter(?string $storageDir = null): self
     {
-        return new self(20, 900); // 20 requests per 15 minutes
+        return new self(20, 900, 'login', $storageDir); // 20 requests per 15 minutes
     }
 
-    public static function generalLimiter(): self
+    public static function generalLimiter(?string $storageDir = null): self
     {
-        return new self(1000, 900); // 1000 requests per 15 minutes
+        return new self(1000, 900, 'general', $storageDir); // 1000 requests per 15 minutes
     }
 
     /**
@@ -65,7 +67,9 @@ class RateLimitMiddleware implements MiddlewareInterface
             $forwardedFor === '' ? null : $forwardedFor,
             $trustProxy
         );
-        $key = hash('sha256', $ip);
+        // Namespace the counter by limiter bucket so independent limiters (e.g. the
+        // global generalLimiter and the per-route loginLimiter) don't share a budget.
+        $key = hash('sha256', $this->bucket . '|' . $ip);
         $file = $this->storageDir . '/' . $key . '.json';
 
         $now = time();
