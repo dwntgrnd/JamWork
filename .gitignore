@@ -37,6 +37,13 @@ DEV-SETUP.md
 docs/production-update-runbook.md
 docs/cc-prompts/
 
+# Internal planning/design docs — kept out of the public repo and release package.
+# History is preserved; these are dropped from the index going forward.
+docs/audits/
+docs/plans/
+docs/specs/
+docs/superpowers/
+
 # Production env (real credentials — never commit)
 api/.env.production
 
