@@ -12,6 +12,7 @@ use JamWork\Routes\WorkspaceSettingsRoutes;
 use JamWork\Routes\ProjectRoutes;
 use JamWork\Routes\LabelRoutes;
 use JamWork\Routes\MilestoneRoutes;
+use JamWork\Routes\ReportRoutes;
 use JamWork\Routes\TaskLinkRoutes;
 use JamWork\Routes\SprintRoutes;
 use JamWork\Routes\TaskRoutes;
@@ -75,6 +76,7 @@ class Bootstrap
         TaskLinkRoutes::register($app);
         SprintRoutes::register($app);
         TaskRoutes::register($app);
+        ReportRoutes::register($app);
 
         return $app;
     }
