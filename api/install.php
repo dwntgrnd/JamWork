@@ -866,6 +866,7 @@ ENV;
             __DIR__ . '/migrations/006_status_report.sql',
             __DIR__ . '/migrations/007_multi_admin_roles.sql',
             __DIR__ . '/migrations/008_report_schedule.sql',
+            __DIR__ . '/migrations/009_report_schedule_last_sent.sql',
         ];
 
         foreach ($migrations as $file) {

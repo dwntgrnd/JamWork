@@ -33,8 +33,11 @@ docker-compose.override.yml
 DEV-SETUP.md
 
 # Operational / local-only — specific to this instance's deployments, not part
-# of the release package others consume.
+# of the release package others consume. Includes the per-version runbooks: they
+# name this instance's prod host, owner email, and secured endpoints (recon value
+# in a public repo), so they are kept local going forward.
 docs/production-update-runbook.md
+docs/production-update-runbook-v*.md
 docs/cc-prompts/
 
 # Internal planning/design docs — kept out of the public repo and release package.
@@ -52,3 +55,7 @@ api/.env.production
 
 # Release build output
 release/
+
+# Generated email preview artifacts (scripts/preview-report-email.php)
+report-email-preview.html
+report-email-preview.txt

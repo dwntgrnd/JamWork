@@ -27,12 +27,28 @@ final class CronRoutesTest extends IntegrationTestCase
         return ['Authorization' => 'Bearer ' . $secret];
     }
 
-    private function enableSchedule(bool $enabled = true): void
-    {
+    /**
+     * Insert the singleton schedule row. By default it is DUE right now: today's
+     * UTC weekday, send time at 00:00 (always past), never sent. Override
+     * dayOfWeek/sendTime/lastSentAt to construct a not-due case.
+     */
+    private function enableSchedule(
+        bool $enabled = true,
+        ?int $dayOfWeek = null,
+        string $sendTime = '00:00:00',
+        ?string $lastSentAt = null
+    ): void {
+        $dow = $dayOfWeek ?? (int) (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('N');
         $this->db->prepare(
-            'INSERT INTO report_schedule (id, enabled, day_of_week, send_time_utc, frequency)
-             VALUES (:id, :enabled, 1, "09:00:00", "weekly")'
-        )->execute(['id' => Uuid::uuid4()->toString(), 'enabled' => $enabled ? 1 : 0]);
+            'INSERT INTO report_schedule (id, enabled, day_of_week, send_time_utc, frequency, last_sent_at)
+             VALUES (:id, :enabled, :dow, :time, "weekly", :last_sent)'
+        )->execute([
+            'id' => Uuid::uuid4()->toString(),
+            'enabled' => $enabled ? 1 : 0,
+            'dow' => $dow,
+            'time' => $sendTime,
+            'last_sent' => $lastSentAt,
+        ]);
     }
 
     private function addRecipient(string $userId, bool $enabled = true): void
@@ -86,6 +102,53 @@ final class CronRoutesTest extends IntegrationTestCase
 
         // Nothing generated.
         $this->assertSame(0, (int) $this->db->query('SELECT COUNT(*) FROM reports')->fetchColumn());
+    }
+
+    public function testSkipsWhenNotScheduledToday(): void
+    {
+        $_ENV['CRON_SECRET'] = self::SECRET;
+        $user = $this->seedUser();
+        $this->seedProject($user['id'], ['name' => 'Apollo']);
+        // Enabled, but scheduled for a different weekday than today.
+        $today = (int) (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('N');
+        $this->enableSchedule(true, dayOfWeek: ($today % 7) + 1);
+
+        $res = $this->request('POST', self::PATH, null, null, $this->auth());
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame('not_due', $this->decode($res)['skipped']);
+        $this->assertSame(0, (int) $this->db->query('SELECT COUNT(*) FROM reports')->fetchColumn());
+    }
+
+    public function testDoesNotResendOnSecondPollWithinSameOccurrence(): void
+    {
+        // The bug guard: the hourly cron must generate + email at most once per
+        // scheduled occurrence, not on every poll.
+        $_ENV['CRON_SECRET'] = self::SECRET;
+        $user = $this->seedUser();
+        $this->seedProject($user['id'], ['name' => 'Apollo']);
+        $this->enableSchedule(); // due now
+
+        $first = $this->request('POST', self::PATH, null, null, $this->auth());
+        $this->assertTrue($this->decode($first)['generated']);
+        $this->assertSame(1, (int) $this->db->query('SELECT COUNT(*) FROM reports')->fetchColumn());
+
+        $second = $this->request('POST', self::PATH, null, null, $this->auth());
+        $this->assertSame('not_due', $this->decode($second)['skipped']);
+        $this->assertSame(1, (int) $this->db->query('SELECT COUNT(*) FROM reports')->fetchColumn());
+    }
+
+    public function testRecordsLastSentAtAfterGenerating(): void
+    {
+        $_ENV['CRON_SECRET'] = self::SECRET;
+        $user = $this->seedUser();
+        $this->seedProject($user['id'], ['name' => 'Apollo']);
+        $this->enableSchedule();
+
+        $this->assertNull($this->db->query('SELECT last_sent_at FROM report_schedule LIMIT 1')->fetchColumn());
+
+        $this->request('POST', self::PATH, null, null, $this->auth());
+
+        $this->assertNotNull($this->db->query('SELECT last_sent_at FROM report_schedule LIMIT 1')->fetchColumn());
     }
 
     // --- Generation branches ------------------------------------------------

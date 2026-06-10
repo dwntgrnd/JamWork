@@ -6,6 +6,7 @@ use JamWork\Lib\Database;
 use JamWork\Lib\Mailer;
 use JamWork\Services\ReportEmailRenderer;
 use JamWork\Services\ReportService;
+use JamWork\Services\ScheduleEvaluator;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\App;
@@ -41,14 +42,30 @@ class CronRoutes
                 $db = Database::getInstance();
 
                 // 2. Schedule gate — missing row or disabled master toggle is a no-op.
-                $schedule = $db->query('SELECT enabled FROM report_schedule LIMIT 1')->fetch();
+                $schedule = $db->query(
+                    'SELECT id, enabled, day_of_week, send_time_utc, last_sent_at FROM report_schedule LIMIT 1'
+                )->fetch();
                 if (!$schedule || (int) $schedule['enabled'] !== 1) {
                     return self::json($response, ['skipped' => 'schedule_disabled']);
+                }
+
+                // 2b. Due gate — this endpoint is polled hourly, so it must fire at
+                // most once per weekly occurrence (day_of_week + send_time_utc, UTC),
+                // not on every poll. ScheduleEvaluator owns that decision.
+                $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+                if (!ScheduleEvaluator::isDue($schedule, $now)) {
+                    return self::json($response, ['skipped' => 'not_due']);
                 }
 
                 // 3. Generate + persist (same logic as manual; scheduled, no user).
                 $report = ReportService::generate(null, type: 'scheduled');
                 $reportId = $report['id'];
+
+                // 3b. Record this occurrence immediately so re-polls within the same
+                // period are no-ops — including the graceful-skip branches below
+                // (the scheduled run happened even when there was nothing to email).
+                $db->prepare('UPDATE report_schedule SET last_sent_at = :now WHERE id = :id')
+                    ->execute(['now' => $now->format('Y-m-d H:i:s'), 'id' => $schedule['id']]);
 
                 // 4. Nothing useful to email when no projects are included.
                 if (!empty($report['payload']['projectsEmpty'])) {
