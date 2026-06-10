@@ -12,6 +12,7 @@ use JamWork\Routes\WorkspaceSettingsRoutes;
 use JamWork\Routes\ProjectRoutes;
 use JamWork\Routes\LabelRoutes;
 use JamWork\Routes\MilestoneRoutes;
+use JamWork\Routes\ReportRoutes;
 use JamWork\Routes\TaskLinkRoutes;
 use JamWork\Routes\SprintRoutes;
 use JamWork\Routes\TaskRoutes;
@@ -31,6 +32,10 @@ class Bootstrap
      */
     public static function createApp(): App
     {
+        // Pin PHP to UTC so date/time math aligns with the UTC-pinned DB session
+        // (Database.php). Both halves are required for correct Done-window/overdue.
+        date_default_timezone_set('UTC');
+
         $app = AppFactory::create();
         $app->setBasePath('/api');
 
@@ -75,6 +80,7 @@ class Bootstrap
         TaskLinkRoutes::register($app);
         SprintRoutes::register($app);
         TaskRoutes::register($app);
+        ReportRoutes::register($app);
 
         return $app;
     }

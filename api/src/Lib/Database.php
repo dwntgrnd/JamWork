@@ -26,6 +26,10 @@ class Database
                     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                     PDO::ATTR_EMULATE_PREPARES   => false,
+                    // Pin the session to UTC so MySQL-written times (NOW(),
+                    // completed_at) and PHP-side time()/strtotime() comparisons
+                    // (Done window, overdue) share one clock regardless of host TZ.
+                    PDO::MYSQL_ATTR_INIT_COMMAND => "SET time_zone = '+00:00'",
                 ]);
             } catch (\PDOException $e) {
                 // DB unreachable (e.g. MySQL down) — surface as a typed, transient

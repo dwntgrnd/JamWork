@@ -62,6 +62,14 @@ class TaskService
             $setParams[$col] = $key === 'inSprintBacklog' ? (int) $value : $value;
         }
 
+        // Maintain completed_at when bulk-setting status (CC30a). Order-independent:
+        // keys off the new status value, not the column being updated in the same statement.
+        if (array_key_exists('status', $fields)) {
+            $setClauses[] = $fields['status'] === 'done'
+                ? 'completed_at = CASE WHEN completed_at IS NULL THEN NOW() ELSE completed_at END'
+                : 'completed_at = NULL';
+        }
+
         $in = TaskModel::buildInClause($taskIds, 'tid');
         $setString = implode(', ', $setClauses);
         $sql = "UPDATE tasks SET {$setString} WHERE id IN ({$in['clause']}) AND deleted_at IS NULL";
@@ -207,11 +215,14 @@ class TaskService
         $assigneeIds = $data['assigneeIds'] ?? [];
         $labelIds = $data['labelIds'] ?? [];
 
+        // A task created directly as 'done' gets its completion timestamp now (CC30a).
+        $completedAtExpr = ($data['status'] ?? 'todo') === 'done' ? 'NOW()' : 'NULL';
+
         $db->beginTransaction();
         try {
             $stmt = $db->prepare(
-                'INSERT INTO tasks (id, title, description, notes, status, priority, effort, due_date, start_date, sort_order, recurrence, sprint_id, project_id, created_by_id, notify_enabled)
-                 VALUES (:id, :title, :description, :notes, :status, :priority, :effort, :due_date, :start_date, :sort_order, :recurrence, :sprint_id, :project_id, :created_by_id, :notify_enabled)'
+                'INSERT INTO tasks (id, title, description, notes, status, priority, effort, due_date, start_date, sort_order, recurrence, sprint_id, project_id, created_by_id, notify_enabled, completed_at)
+                 VALUES (:id, :title, :description, :notes, :status, :priority, :effort, :due_date, :start_date, :sort_order, :recurrence, :sprint_id, :project_id, :created_by_id, :notify_enabled, ' . $completedAtExpr . ')'
             );
             $stmt->execute([
                 'id' => $id,
@@ -358,6 +369,13 @@ class TaskService
         if (isset($data['status'])) {
             $updates[] = 'status = :status';
             $updateParams['status'] = $data['status'];
+
+            // Maintain completed_at on the Done transition (CC30a); updated_at is not a proxy.
+            if ($data['status'] === 'done' && $existingTask['status'] !== 'done') {
+                $updates[] = 'completed_at = NOW()';
+            } elseif ($data['status'] !== 'done' && $existingTask['status'] === 'done') {
+                $updates[] = 'completed_at = NULL';
+            }
         }
         if (isset($data['priority'])) {
             $updates[] = 'priority = :priority';
