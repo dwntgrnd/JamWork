@@ -42,6 +42,7 @@ import {
   Trash2,
   Calendar,
   GanttChart,
+  FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -290,6 +291,42 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
                 >
                   <Calendar className="h-5 w-5 mr-2" />
                   Sprints
+                </Button>
+              </Link>
+            )}
+
+            {/* Reports */}
+            {collapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link to="/reports" onClick={onNavigate} aria-current={pathname === '/reports' ? 'page' : undefined}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "w-full h-10 p-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                        pathname === '/reports' && "bg-sidebar-accent text-sidebar-primary font-medium"
+                      )}
+                      aria-label="Reports"
+                    >
+                      <FileText className="h-5 w-5" />
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right">Reports</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Link to="/reports" onClick={onNavigate} aria-current={pathname === '/reports' ? 'page' : undefined}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "w-full justify-start focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    pathname === '/reports' && "bg-sidebar-accent text-sidebar-primary font-medium"
+                  )}
+                >
+                  <FileText className="h-5 w-5 mr-2" />
+                  Reports
                 </Button>
               </Link>
             )}

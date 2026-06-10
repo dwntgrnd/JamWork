@@ -13,6 +13,8 @@ import BoardPage from './pages/project-board';
 import ProjectTimelinePage from './pages/project-timeline';
 import GlobalTimelinePage from './pages/timeline';
 import SprintsPage from './pages/sprints';
+import ReportsPage from './pages/reports';
+import ReportDetailPage from './pages/report-detail';
 import SettingsPage from './pages/settings';
 import AdminPage from './pages/admin';
 import NotFoundPage from './pages/not-found';
@@ -52,6 +54,8 @@ export const router = createBrowserRouter([
       { path: 'all-tasks', element: <AllTasksPage /> },
       { path: 'my-tasks', element: <MyTasksPage /> },
       { path: 'sprints', element: <SprintsPage /> },
+      { path: 'reports', element: <ReportsPage /> },
+      { path: 'reports/:id', element: <ReportDetailPage /> },
       { path: 'timeline', element: <GlobalTimelinePage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'admin', element: <AdminPage /> },
