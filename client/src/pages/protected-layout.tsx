@@ -17,6 +17,7 @@ import {
 import { Sun, Moon, Menu, X, LogOut, Settings, Shield } from 'lucide-react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router';
 import { useWorkspaceName } from '@/hooks/use-workspace-name';
+import { isAdminOrOwner } from '@/types';
 
 export default function ProtectedLayout() {
   const { user, logout } = useAuth();
@@ -154,7 +155,7 @@ export default function ProtectedLayout() {
                     Settings
                   </Link>
                 </DropdownMenuItem>
-                {user?.role === 'admin' && (
+                {isAdminOrOwner(user?.role) && (
                   <DropdownMenuItem asChild>
                     <Link to="/admin" className="cursor-pointer">
                       <Shield className="mr-2 h-4 w-4" />

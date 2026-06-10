@@ -4,8 +4,10 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import ReportsPage from '@/pages/reports'
 import { useReports, invalidateReports } from '@/hooks/use-reports'
+import { useAuth } from '@/hooks/use-auth'
 import { apiPost } from '@/lib/api'
 import type { ReportSummary } from '@/types/report'
+import type { UserRole } from '@/types'
 
 const navigateMock = vi.fn()
 vi.mock('react-router', async (importOriginal) => ({
@@ -15,12 +17,19 @@ vi.mock('react-router', async (importOriginal) => ({
 vi.mock('@/hooks/use-reports', () => ({
   useReports: vi.fn(),
   invalidateReports: vi.fn(() => Promise.resolve()),
+  useDeleteReport: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
 }))
+vi.mock('@/hooks/use-auth', () => ({ useAuth: vi.fn() }))
 vi.mock('@/lib/api', () => ({ apiPost: vi.fn(), getErrorMessage: (e: unknown) => String(e) }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 const mockedUseReports = useReports as ReturnType<typeof vi.fn>
+const mockedUseAuth = useAuth as ReturnType<typeof vi.fn>
 const mockedApiPost = apiPost as ReturnType<typeof vi.fn>
+
+const userWithRole = (role: UserRole) => ({
+  user: { id: 'u1', email: 'u1@example.com', displayName: 'U1', role },
+})
 
 const newer: ReportSummary = { id: 'r2', generatedAt: '2026-06-10T12:00:00+00:00', type: 'ad_hoc', triggeredBy: { id: 'u1', displayName: 'Ada' } }
 const older: ReportSummary = { id: 'r1', generatedAt: '2026-06-01T09:00:00+00:00', type: 'scheduled', triggeredBy: null }
@@ -38,6 +47,7 @@ describe('ReportsPage — archive', () => {
     navigateMock.mockReset()
     mockedUseReports.mockReset()
     mockedApiPost.mockReset()
+    mockedUseAuth.mockReturnValue(userWithRole('admin'))
     ;(invalidateReports as ReturnType<typeof vi.fn>).mockClear()
   })
   afterEach(cleanup)
@@ -72,6 +82,21 @@ describe('ReportsPage — archive', () => {
     renderPage()
     expect(screen.getByText(/failed to load/i)).toBeInTheDocument()
   })
+
+  it('shows the delete control to owner and admin, but not to member', () => {
+    mockedUseReports.mockReturnValue(hookState({ data: [newer] }))
+
+    for (const role of ['owner', 'admin'] as const) {
+      mockedUseAuth.mockReturnValue(userWithRole(role))
+      renderPage()
+      expect(screen.getByRole('button', { name: /delete report/i })).toBeInTheDocument()
+      cleanup()
+    }
+
+    mockedUseAuth.mockReturnValue(userWithRole('member'))
+    renderPage()
+    expect(screen.queryByRole('button', { name: /delete report/i })).not.toBeInTheDocument()
+  })
 })
 
 describe('ReportsPage — generate', () => {
@@ -79,6 +104,7 @@ describe('ReportsPage — generate', () => {
     navigateMock.mockReset()
     mockedUseReports.mockReturnValue(hookState({ data: [] }))
     mockedApiPost.mockReset()
+    mockedUseAuth.mockReturnValue(userWithRole('admin'))
     ;(invalidateReports as ReturnType<typeof vi.fn>).mockClear()
   })
   afterEach(cleanup)

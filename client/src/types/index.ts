@@ -2,7 +2,12 @@
 
 export type TaskStatus = "todo" | "in_progress" | "blocked" | "review" | "done";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
-export type UserRole = "user" | "admin";
+export type UserRole = "owner" | "admin" | "member";
+
+/** True for roles with admin-page access (owner and admin). */
+export function isAdminOrOwner(role: string | undefined): boolean {
+  return role === "admin" || role === "owner";
+}
 export type RecurrenceType = "daily" | "weekly" | "biweekly" | "monthly";
 export type TaskEffort = 1 | 2 | 4 | 8;
 export type SprintStatus = "active" | "completed";

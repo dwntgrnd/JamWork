@@ -10,11 +10,12 @@ import { Button } from '@/components/ui/button';
 import { FileText, Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ReportDetail, ReportSummary } from '@/types/report';
+import { isAdminOrOwner } from '@/types';
 
 export default function ReportsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = isAdminOrOwner(user?.role);
   const { data: reports, isPending, isError, refetch } = useReports();
   const deleteReport = useDeleteReport();
   const [toDelete, setToDelete] = useState<ReportSummary | null>(null);

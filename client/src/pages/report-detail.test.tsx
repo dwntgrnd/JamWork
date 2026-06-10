@@ -4,15 +4,23 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router'
 import ReportDetailPage from '@/pages/report-detail'
 import { useReport } from '@/hooks/use-reports'
+import { useAuth } from '@/hooks/use-auth'
 import { downloadReportMarkdown } from '@/lib/download'
 import type { ReportDetail } from '@/types/report'
+import type { UserRole } from '@/types'
 
-vi.mock('@/hooks/use-reports', () => ({ useReport: vi.fn() }))
+vi.mock('@/hooks/use-reports', () => ({ useReport: vi.fn(), useDeleteReport: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }) }))
+vi.mock('@/hooks/use-auth', () => ({ useAuth: vi.fn() }))
 vi.mock('@/lib/download', () => ({ downloadReportMarkdown: vi.fn(() => Promise.resolve()) }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 const mockedUseReport = useReport as ReturnType<typeof vi.fn>
+const mockedUseAuth = useAuth as ReturnType<typeof vi.fn>
 const mockedDownload = downloadReportMarkdown as ReturnType<typeof vi.fn>
+
+const userWithRole = (role: UserRole) => ({
+  user: { id: 'u1', email: 'u1@example.com', displayName: 'U1', role },
+})
 
 const detail: ReportDetail = {
   id: 'r1',
@@ -50,6 +58,7 @@ describe('ReportDetailPage', () => {
   beforeEach(() => {
     mockedUseReport.mockReset()
     mockedDownload.mockReset().mockResolvedValue(undefined)
+    mockedUseAuth.mockReturnValue(userWithRole('admin'))
   })
   afterEach(cleanup)
 
@@ -92,5 +101,20 @@ describe('ReportDetailPage', () => {
     renderAt()
 
     expect(screen.getByText(/failed to load/i)).toBeInTheDocument()
+  })
+
+  it('shows the delete control to owner and admin, but not to member', () => {
+    mockedUseReport.mockReturnValue(hookState({ data: detail }))
+
+    for (const role of ['owner', 'admin'] as const) {
+      mockedUseAuth.mockReturnValue(userWithRole(role))
+      renderAt()
+      expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument()
+      cleanup()
+    }
+
+    mockedUseAuth.mockReturnValue(userWithRole('member'))
+    renderAt()
+    expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
   })
 })
