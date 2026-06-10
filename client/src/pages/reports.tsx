@@ -1,18 +1,32 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { useReports, invalidateReports } from '@/hooks/use-reports';
+import { useReports, invalidateReports, useDeleteReport } from '@/hooks/use-reports';
+import { useAuth } from '@/hooks/use-auth';
 import { apiPost, getErrorMessage } from '@/lib/api';
 import { reportTypeLabel, formatReportDateTime, triggeredByLabel } from '@/lib/report-format';
+import { DeleteReportDialog } from '@/components/report/delete-report-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Loader2, Plus } from 'lucide-react';
+import { FileText, Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { ReportDetail } from '@/types/report';
+import type { ReportDetail, ReportSummary } from '@/types/report';
 
 export default function ReportsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const { data: reports, isPending, isError, refetch } = useReports();
+  const deleteReport = useDeleteReport();
+  const [toDelete, setToDelete] = useState<ReportSummary | null>(null);
   const [generating, setGenerating] = useState(false);
+
+  const handleConfirmDelete = () => {
+    if (!toDelete) return;
+    deleteReport.mutate(toDelete.id, {
+      onSuccess: () => toast.success('Report deleted'),
+      onError: (err) => toast.error(getErrorMessage(err, 'Failed to delete report')),
+    });
+  };
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -65,10 +79,10 @@ export default function ReportsPage() {
         ) : (
           <ul className="divide-y divide-border rounded-lg border border-border bg-card">
             {reports.map((report) => (
-              <li key={report.id}>
+              <li key={report.id} className="flex items-center">
                 <Link
                   to={`/reports/${report.id}`}
-                  className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/50"
+                  className="flex flex-1 items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/50"
                 >
                   <div className="min-w-0">
                     <span className="font-medium text-foreground">{formatReportDateTime(report.generatedAt)}</span>
@@ -80,11 +94,28 @@ export default function ReportsPage() {
                     {reportTypeLabel(report.type)}
                   </Badge>
                 </Link>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    aria-label="Delete report"
+                    onClick={() => setToDelete(report)}
+                    disabled={deleteReport.isPending}
+                    className="shrink-0 px-4 py-3 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      <DeleteReportDialog
+        open={!!toDelete}
+        onOpenChange={(open) => !open && setToDelete(null)}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }

@@ -297,6 +297,20 @@ class ReportService
         return $row['markdown'];
     }
 
+    /** DELETE /reports/{id} — hard-delete a stored snapshot. */
+    public static function deleteReport(string $id): void
+    {
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT id FROM reports WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+        if (!$stmt->fetch()) {
+            throw new ServiceException(404, 'Report not found');
+        }
+
+        $stmt = $db->prepare('DELETE FROM reports WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
+
     // --- Fetch helpers ------------------------------------------------------
 
     private static function fetchIncludedProjects(PDO $db): array
