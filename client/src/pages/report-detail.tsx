@@ -11,12 +11,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Download, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { isAdminOrOwner } from '@/types';
 
 export default function ReportDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = isAdminOrOwner(user?.role);
   const { data: report, isPending, isError, refetch } = useReport(id);
   const deleteReport = useDeleteReport();
   const [showDelete, setShowDelete] = useState(false);
