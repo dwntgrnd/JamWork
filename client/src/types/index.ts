@@ -55,6 +55,7 @@ export interface Project {
   endDate?: Date | string;
   sprintPlanning?: boolean;
   defaultNotifyEnabled?: boolean;
+  includeInStatusReport?: boolean;
   createdById: string;
   createdAt: Date | string;
   updatedAt: Date | string;

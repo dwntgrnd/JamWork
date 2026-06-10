@@ -42,6 +42,7 @@ export function ProjectSettingsDialog({
   const [endDate, setEndDate] = useState(toDateInput(project.endDate));
   const [sprintPlanning, setSprintPlanning] = useState(project.sprintPlanning !== false);
   const [defaultNotifyEnabled, setDefaultNotifyEnabled] = useState(project.defaultNotifyEnabled !== false);
+  const [includeInStatusReport, setIncludeInStatusReport] = useState(project.includeInStatusReport !== false);
   const [saving, setSaving] = useState(false);
 
   // Re-sync form when a different project is opened or the dialog re-opens.
@@ -53,6 +54,7 @@ export function ProjectSettingsDialog({
       setEndDate(toDateInput(project.endDate));
       setSprintPlanning(project.sprintPlanning !== false);
       setDefaultNotifyEnabled(project.defaultNotifyEnabled !== false);
+      setIncludeInStatusReport(project.includeInStatusReport !== false);
     }
   }, [open, project]);
 
@@ -73,6 +75,7 @@ export function ProjectSettingsDialog({
           endDate: endDate || null,
           sprintPlanning,
           defaultNotifyEnabled,
+          includeInStatusReport,
         }
       );
       invalidateProjects();
@@ -169,6 +172,20 @@ export function ProjectSettingsDialog({
               id="settings-default-notify"
               checked={defaultNotifyEnabled}
               onCheckedChange={setDefaultNotifyEnabled}
+            />
+          </div>
+
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="settings-include-in-status-report">Include in status report</Label>
+              <p className="text-xs text-muted-foreground">
+                When off, this project and its tasks are excluded from generated status reports.
+              </p>
+            </div>
+            <Switch
+              id="settings-include-in-status-report"
+              checked={includeInStatusReport}
+              onCheckedChange={setIncludeInStatusReport}
             />
           </div>
         </div>
