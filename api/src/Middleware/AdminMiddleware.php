@@ -14,7 +14,7 @@ class AdminMiddleware implements MiddlewareInterface
     {
         $role = $request->getAttribute('role');
 
-        if ($role !== 'admin') {
+        if (!in_array($role, ['owner', 'admin'], true)) {
             $response = new SlimResponse();
             $response->getBody()->write(json_encode(['error' => 'Admin access required']));
             return $response

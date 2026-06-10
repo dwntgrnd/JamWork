@@ -108,8 +108,20 @@ class AdminRoutes
                     ->withStatus(201);
             });
 
-            // PUT /admin/transfer
+            // PUT /admin/transfer — owner transfers ownership to an admin.
+            // The transferring owner is demoted to admin (Decision #106), NOT member.
             $group->put('/transfer', function (Request $request, Response $response) {
+                $callerRole = $request->getAttribute('role');
+
+                if ($callerRole !== 'owner') {
+                    $response->getBody()->write(json_encode([
+                        'error' => 'Only the workspace owner can transfer ownership',
+                    ]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(403);
+                }
+
                 $data = $request->getParsedBody() ?? [];
 
                 $errors = Validator::validate($data, [
@@ -125,7 +137,7 @@ class AdminRoutes
 
                 if ($targetUserId === $adminId) {
                     $response->getBody()->write(json_encode([
-                        'error' => 'Cannot transfer admin to yourself',
+                        'error' => 'Cannot transfer ownership to yourself',
                     ]));
                     return $response
                         ->withHeader('Content-Type', 'application/json')
@@ -134,7 +146,7 @@ class AdminRoutes
 
                 $db = Database::getInstance();
 
-                $stmt = $db->prepare('SELECT id, email, display_name FROM users WHERE id = :id');
+                $stmt = $db->prepare('SELECT id, email, display_name, role FROM users WHERE id = :id');
                 $stmt->execute(['id' => $targetUserId]);
                 $targetUser = $stmt->fetch();
 
@@ -147,33 +159,198 @@ class AdminRoutes
                         ->withStatus(404);
                 }
 
+                if ($targetUser['role'] !== 'admin') {
+                    $response->getBody()->write(json_encode([
+                        'error' => 'Target must be an admin to receive ownership. Promote them first.',
+                    ]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(400);
+                }
+
                 try {
                     $db->beginTransaction();
 
+                    // Demote the current owner to admin (NOT member) — they retain admin access.
                     $stmt = $db->prepare('UPDATE users SET role = :role WHERE id = :id');
-                    $stmt->execute(['role' => 'member', 'id' => $adminId]);
+                    $stmt->execute(['role' => 'admin', 'id' => $adminId]);
 
                     $stmt = $db->prepare('UPDATE users SET role = :role WHERE id = :id');
-                    $stmt->execute(['role' => 'admin', 'id' => $targetUserId]);
+                    $stmt->execute(['role' => 'owner', 'id' => $targetUserId]);
 
                     $db->commit();
                 } catch (\Exception $e) {
                     $db->rollBack();
                     error_log('Transfer error: ' . $e->getMessage());
                     $response->getBody()->write(json_encode([
-                        'error' => 'Failed to transfer admin rights',
+                        'error' => 'Failed to transfer ownership',
                     ]));
                     return $response
                         ->withHeader('Content-Type', 'application/json')
                         ->withStatus(500);
                 }
 
+                // The caller's JWT now carries a stale role. Signal the client to
+                // re-fetch /auth/me; we do not re-issue the cookie here (CC31b).
                 $response->getBody()->write(json_encode([
-                    'message' => 'Admin rights transferred',
-                    'newAdmin' => [
+                    'message' => 'Ownership transferred',
+                    'reauthRequired' => true,
+                    'newOwner' => [
                         'id' => $targetUser['id'],
                         'email' => $targetUser['email'],
                         'displayName' => $targetUser['display_name'],
+                    ],
+                ]));
+                return $response
+                    ->withHeader('Content-Type', 'application/json')
+                    ->withStatus(200);
+            });
+
+            // PUT /admin/users/{id}/promote — owner only; member → admin.
+            $group->put('/users/{id}/promote', function (Request $request, Response $response, array $args) {
+                $id = $args['id'];
+
+                if (!Validator::isUuid($id)) {
+                    $response->getBody()->write(json_encode([
+                        'error' => 'id must be a valid UUID',
+                    ]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(400);
+                }
+
+                if ($request->getAttribute('role') !== 'owner') {
+                    $response->getBody()->write(json_encode([
+                        'error' => 'Only the workspace owner can promote users',
+                    ]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(403);
+                }
+
+                if ($id === $request->getAttribute('userId')) {
+                    $response->getBody()->write(json_encode([
+                        'error' => 'Cannot promote yourself',
+                    ]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(400);
+                }
+
+                $db = Database::getInstance();
+
+                $stmt = $db->prepare('SELECT id, role FROM users WHERE id = :id');
+                $stmt->execute(['id' => $id]);
+                $targetUser = $stmt->fetch();
+
+                if (!$targetUser) {
+                    $response->getBody()->write(json_encode([
+                        'error' => 'User not found',
+                    ]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(404);
+                }
+
+                if ($targetUser['role'] !== 'member') {
+                    $message = $targetUser['role'] === 'owner'
+                        ? 'Cannot promote the owner'
+                        : 'User is already an admin';
+                    $response->getBody()->write(json_encode(['error' => $message]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(400);
+                }
+
+                $stmt = $db->prepare('UPDATE users SET role = :role WHERE id = :id');
+                $stmt->execute(['role' => 'admin', 'id' => $id]);
+
+                $stmt = $db->prepare('SELECT id, email, display_name, role FROM users WHERE id = :id');
+                $stmt->execute(['id' => $id]);
+                $updated = $stmt->fetch();
+
+                $response->getBody()->write(json_encode([
+                    'user' => [
+                        'id' => $updated['id'],
+                        'email' => $updated['email'],
+                        'displayName' => $updated['display_name'],
+                        'role' => $updated['role'],
+                    ],
+                ]));
+                return $response
+                    ->withHeader('Content-Type', 'application/json')
+                    ->withStatus(200);
+            });
+
+            // PUT /admin/users/{id}/demote — owner only; admin → member.
+            $group->put('/users/{id}/demote', function (Request $request, Response $response, array $args) {
+                $id = $args['id'];
+
+                if (!Validator::isUuid($id)) {
+                    $response->getBody()->write(json_encode([
+                        'error' => 'id must be a valid UUID',
+                    ]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(400);
+                }
+
+                if ($request->getAttribute('role') !== 'owner') {
+                    $response->getBody()->write(json_encode([
+                        'error' => 'Only the workspace owner can demote users',
+                    ]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(403);
+                }
+
+                if ($id === $request->getAttribute('userId')) {
+                    $response->getBody()->write(json_encode([
+                        'error' => 'Cannot demote yourself',
+                    ]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(400);
+                }
+
+                $db = Database::getInstance();
+
+                $stmt = $db->prepare('SELECT id, role FROM users WHERE id = :id');
+                $stmt->execute(['id' => $id]);
+                $targetUser = $stmt->fetch();
+
+                if (!$targetUser) {
+                    $response->getBody()->write(json_encode([
+                        'error' => 'User not found',
+                    ]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(404);
+                }
+
+                if ($targetUser['role'] !== 'admin') {
+                    $message = $targetUser['role'] === 'owner'
+                        ? 'Cannot demote the owner'
+                        : 'User is not an admin';
+                    $response->getBody()->write(json_encode(['error' => $message]));
+                    return $response
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withStatus(400);
+                }
+
+                $stmt = $db->prepare('UPDATE users SET role = :role WHERE id = :id');
+                $stmt->execute(['role' => 'member', 'id' => $id]);
+
+                $stmt = $db->prepare('SELECT id, email, display_name, role FROM users WHERE id = :id');
+                $stmt->execute(['id' => $id]);
+                $updated = $stmt->fetch();
+
+                $response->getBody()->write(json_encode([
+                    'user' => [
+                        'id' => $updated['id'],
+                        'email' => $updated['email'],
+                        'displayName' => $updated['display_name'],
+                        'role' => $updated['role'],
                     ],
                 ]));
                 return $response
@@ -207,15 +384,20 @@ class AdminRoutes
 
                 $db = Database::getInstance();
 
-                $stmt = $db->prepare('SELECT id FROM users WHERE id = :id');
+                $stmt = $db->prepare('SELECT id, role FROM users WHERE id = :id');
                 $stmt->execute(['id' => $id]);
-                if (!$stmt->fetch()) {
+                $targetUser = $stmt->fetch();
+                if (!$targetUser) {
                     $response->getBody()->write(json_encode([
                         'error' => 'User not found',
                     ]));
                     return $response
                         ->withHeader('Content-Type', 'application/json')
                         ->withStatus(404);
+                }
+
+                if ($denied = self::denyIfTargetForbidden($request->getAttribute('role'), $targetUser['role'], $response)) {
+                    return $denied;
                 }
 
                 $temporaryPassword = bin2hex(random_bytes(8));
@@ -283,6 +465,10 @@ class AdminRoutes
                     return $response
                         ->withHeader('Content-Type', 'application/json')
                         ->withStatus(404);
+                }
+
+                if ($denied = self::denyIfTargetForbidden($request->getAttribute('role'), $targetUser['role'], $response)) {
+                    return $denied;
                 }
 
                 $updates = [];
@@ -374,13 +560,8 @@ class AdminRoutes
                         ->withStatus(404);
                 }
 
-                if ($targetUser['role'] === 'admin') {
-                    $response->getBody()->write(json_encode([
-                        'error' => 'Cannot delete an admin user',
-                    ]));
-                    return $response
-                        ->withHeader('Content-Type', 'application/json')
-                        ->withStatus(403);
+                if ($denied = self::denyIfTargetForbidden($request->getAttribute('role'), $targetUser['role'], $response)) {
+                    return $denied;
                 }
 
                 try {
@@ -424,5 +605,31 @@ class AdminRoutes
             });
 
         })->add(new AdminMiddleware())->add(new AuthMiddleware());
+    }
+
+    /**
+     * Shared target-permission rule for edit / delete / reset-password.
+     * Admin callers may only act on member-role targets; owner callers may act
+     * on any non-owner target. Returns a 403 response when denied, else null.
+     * (Self-target is blocked earlier by each endpoint's own check.)
+     */
+    private static function denyIfTargetForbidden(string $callerRole, string $targetRole, Response $response): ?Response
+    {
+        $error = null;
+
+        if ($callerRole === 'admin' && $targetRole !== 'member') {
+            $error = 'You do not have permission to manage this user';
+        } elseif ($callerRole === 'owner' && $targetRole === 'owner') {
+            $error = 'Cannot modify the workspace owner';
+        }
+
+        if ($error === null) {
+            return null;
+        }
+
+        $response->getBody()->write(json_encode(['error' => $error]));
+        return $response
+            ->withHeader('Content-Type', 'application/json')
+            ->withStatus(403);
     }
 }
