@@ -187,7 +187,8 @@ class ReportService
     public static function generate(
         ?string $userId,
         int $windowDays = self::DEFAULT_WINDOW_DAYS,
-        int $horizonDays = self::DEFAULT_HORIZON_DAYS
+        int $horizonDays = self::DEFAULT_HORIZON_DAYS,
+        string $type = 'ad_hoc'
     ): array {
         $db = Database::getInstance();
         $nowTs = time();
@@ -219,7 +220,7 @@ class ReportService
         $stmt->execute([
             'id' => $id,
             'generated_at' => date('Y-m-d H:i:s', $nowTs),
-            'type' => 'ad_hoc',
+            'type' => $type,
             'triggered_by' => $userId,
             'window_days' => $windowDays,
             'payload_json' => json_encode($payload),

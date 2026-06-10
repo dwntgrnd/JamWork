@@ -69,6 +69,12 @@ class AdminRoutes
                     'must_reset_password' => 1,
                 ]);
 
+                // New members default to enabled report recipients (Decision #103).
+                $stmt = $db->prepare(
+                    'INSERT INTO report_recipients (id, user_id, enabled) VALUES (:id, :user_id, 1)'
+                );
+                $stmt->execute(['id' => Uuid::uuid4()->toString(), 'user_id' => $userId]);
+
                 // Attempt to send invite email
                 $emailSent = false;
                 if (Mailer::isConfigured()) {

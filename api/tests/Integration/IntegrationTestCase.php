@@ -43,18 +43,25 @@ abstract class IntegrationTestCase extends TestCase
     /**
      * Dispatch a request through the app. $path is relative to the /api base
      * path (e.g. '/tasks'). A non-null $token is sent as the auth cookie.
+     * $headers are added verbatim (e.g. ['Authorization' => 'Bearer ...'] for
+     * the shared-secret cron endpoint, which has no user session).
      */
     protected function request(
         string $method,
         string $path,
         ?array $body = null,
-        ?string $token = null
+        ?string $token = null,
+        array $headers = []
     ): ResponseInterface {
         $request = (new ServerRequestFactory())
             ->createServerRequest($method, '/api' . $path, ['REMOTE_ADDR' => '127.0.0.1']);
 
         if ($token !== null) {
             $request = $request->withCookieParams(['token' => $token]);
+        }
+
+        foreach ($headers as $name => $value) {
+            $request = $request->withHeader($name, $value);
         }
 
         if ($body !== null) {

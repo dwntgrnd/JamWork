@@ -93,6 +93,24 @@ final class AdminRoutesTest extends IntegrationTestCase
         $this->assertSame(403, $response->getStatusCode());
     }
 
+    public function testInviteCreatesEnabledReportRecipient(): void
+    {
+        [$owner] = $this->seedTrio();
+        $response = $this->request('POST', '/admin/invite', [
+            'email' => 'newmember@example.com',
+            'displayName' => 'New Member',
+        ], $this->tokenFor($owner));
+        $this->assertSame(201, $response->getStatusCode());
+
+        $newUserId = $this->decode($response)['user']['id'];
+        $stmt = $this->db->prepare('SELECT enabled FROM report_recipients WHERE user_id = :id');
+        $stmt->execute(['id' => $newUserId]);
+        $enabled = $stmt->fetchColumn();
+
+        $this->assertNotFalse($enabled, 'invite should create a report_recipients row');
+        $this->assertSame(1, (int) $enabled);
+    }
+
     // --- PUT /admin/users/{id} (edit) ---------------------------------------
 
     public function testOwnerEditsMember(): void

@@ -215,6 +215,35 @@ class Mailer
         }
     }
 
+    /**
+     * Send a scheduled status report. Bodies are pre-rendered by
+     * ReportEmailRenderer (HTML + plain-text AltBody); this method only sets the
+     * subject and dispatches, matching the other send* methods' return contract.
+     */
+    public function sendStatusReportEmail(
+        string $toEmail,
+        string $toDisplayName,
+        string $htmlBody,
+        string $textBody,
+        string $workspaceName
+    ): array {
+        try {
+            $this->mail->addAddress($toEmail, $toDisplayName);
+            $this->mail->Subject = "Status Report — {$workspaceName}";
+            $this->mail->Body = $htmlBody;
+            $this->mail->AltBody = $textBody;
+
+            $this->mail->send();
+
+            return ['sent' => true, 'error' => null];
+        } catch (\Exception $e) {
+            error_log('Mailer error (status report): ' . $this->mail->ErrorInfo);
+            return ['sent' => false, 'error' => $this->mail->ErrorInfo];
+        } finally {
+            $this->mail->clearAddresses();
+        }
+    }
+
     public function sendTaskChangedEmail(
         string $toEmail,
         string $toDisplayName,
