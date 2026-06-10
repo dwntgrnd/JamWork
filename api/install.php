@@ -863,6 +863,8 @@ ENV;
             __DIR__ . '/migrations/003_project_sprint_planning.sql',
             __DIR__ . '/migrations/004_notification_preferences.sql',
             __DIR__ . '/migrations/005_add_token_version.sql',
+            __DIR__ . '/migrations/006_status_report.sql',
+            __DIR__ . '/migrations/007_multi_admin_roles.sql',
         ];
 
         foreach ($migrations as $file) {
@@ -881,7 +883,7 @@ ENV;
 
         $stmt = $pdo->prepare(
             "INSERT INTO users (id, email, password_hash, display_name, role, must_reset_password)
-             VALUES (?, ?, ?, ?, 'admin', 0)"
+             VALUES (?, ?, ?, ?, 'owner', 0)"
         );
         $stmt->execute([$userId, $admin['email'], $passwordHash, $admin['display_name']]);
 

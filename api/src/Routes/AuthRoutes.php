@@ -193,7 +193,7 @@ class AuthRoutes
 
                 $db = Database::getInstance();
 
-                // Check if any users exist — first user becomes admin, rest blocked
+                // Check if any users exist — first user becomes owner, rest blocked
                 $stmt = $db->query('SELECT COUNT(*) as count FROM users');
                 $count = (int) $stmt->fetch()['count'];
 
@@ -221,7 +221,7 @@ class AuthRoutes
                         'email' => $email,
                         'password_hash' => $passwordHash,
                         'display_name' => $displayName,
-                        'role' => 'admin',
+                        'role' => 'owner',
                         'must_reset_password' => 0,
                     ]);
                 } catch (\PDOException $e) {
@@ -237,13 +237,13 @@ class AuthRoutes
                     throw $e;
                 }
 
-                $response = Auth::setAuthCookie($response, $userId, 'admin', 0);
+                $response = Auth::setAuthCookie($response, $userId, 'owner', 0);
                 $response->getBody()->write(json_encode([
                     'user' => [
                         'id' => $userId,
                         'email' => $email,
                         'displayName' => $displayName,
-                        'role' => 'admin',
+                        'role' => 'owner',
                         // New user → all notification preferences default ON.
                         'notifyAssigned' => true,
                         'notifyUnassigned' => true,
@@ -548,7 +548,7 @@ class AuthRoutes
             // GET /auth/users
             $group->get('/users', function (Request $request, Response $response) {
                 $db = Database::getInstance();
-                $isAdmin = $request->getAttribute('role') === 'admin';
+                $isAdmin = in_array($request->getAttribute('role'), ['owner', 'admin'], true);
 
                 $stmt = $db->query('SELECT id, email, display_name, role, created_at FROM users ORDER BY created_at ASC');
                 $users = $stmt->fetchAll();
