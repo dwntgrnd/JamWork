@@ -15,6 +15,7 @@ class ReportMarkdownRenderer
     {
         $lines = [];
         $horizon = $payload['milestoneHorizonDays'] ?? ReportService::DEFAULT_HORIZON_DAYS;
+        $copy = $payload['copy'];
 
         $lines[] = '# Status Report — ' . self::date($payload['generatedAt'], 'F j, Y');
         $lines[] = '';
@@ -22,7 +23,7 @@ class ReportMarkdownRenderer
         // Global milestone block (always rendered, with an honest empty state).
         $lines[] = "## Milestones (next {$horizon} days)";
         if (empty($payload['milestones'])) {
-            $lines[] = "No milestones in the next {$horizon} days.";
+            $lines[] = $copy['noMilestones'];
         } else {
             foreach ($payload['milestones'] as $milestone) {
                 $lines[] = '- ' . $milestone['name'] . ' — ' . self::date($milestone['date'], 'F j, Y');
@@ -31,7 +32,7 @@ class ReportMarkdownRenderer
         $lines[] = '';
 
         if (empty($payload['projects'])) {
-            $lines[] = 'No projects are included in the status report.';
+            $lines[] = $copy['noProjects'];
             return self::finish($lines);
         }
 
@@ -39,7 +40,7 @@ class ReportMarkdownRenderer
             $lines[] = '## ' . $project['name'];
 
             if (empty($project['groups'])) {
-                $lines[] = 'No active tasks.';
+                $lines[] = $copy['noActiveTasks'];
                 $lines[] = '';
                 continue;
             }
@@ -47,7 +48,7 @@ class ReportMarkdownRenderer
             foreach ($project['groups'] as $group) {
                 $lines[] = '### ' . $group['label'];
                 foreach ($group['tasks'] as $task) {
-                    $lines[] = self::taskLine($task);
+                    $lines[] = self::taskLine($task, $copy['unassigned']);
                 }
             }
             $lines[] = '';
@@ -56,12 +57,12 @@ class ReportMarkdownRenderer
         return self::finish($lines);
     }
 
-    private static function taskLine(array $task): string
+    private static function taskLine(array $task, string $unassignedLabel): string
     {
         $parts = [$task['title']];
 
         $names = array_map(fn($a) => $a['name'], $task['assignees'] ?? []);
-        $parts[] = $names !== [] ? implode(', ', $names) : 'Unassigned';
+        $parts[] = $names !== [] ? implode(', ', $names) : $unassignedLabel;
 
         if (!empty($task['dueDate'])) {
             $parts[] = 'due ' . self::date($task['dueDate'], 'M j, Y');

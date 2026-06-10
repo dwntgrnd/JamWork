@@ -33,6 +33,12 @@ class ReportService
     public const DEFAULT_WINDOW_DAYS = 7;
     public const DEFAULT_HORIZON_DAYS = 90;
 
+    // Rendered copy embedded in the payload so the frontend reads the exact same
+    // strings as the markdown (single source of truth; no client copy decisions).
+    public const COPY_NO_PROJECTS = 'No projects are included in the status report.';
+    public const COPY_NO_ACTIVE_TASKS = 'No active tasks.';
+    public const COPY_UNASSIGNED = 'Unassigned';
+
     /** A non-Done task with a due date in the past is overdue. */
     public static function isOverdue(string $status, ?string $dueDate, int $nowTs): bool
     {
@@ -161,6 +167,12 @@ class ReportService
             'milestones' => self::filterMilestones($milestoneRows, $nowTs, $horizonDays),
             'projects' => $projects,
             'projectsEmpty' => empty($projectsData),
+            'copy' => [
+                'noProjects' => self::COPY_NO_PROJECTS,
+                'noActiveTasks' => self::COPY_NO_ACTIVE_TASKS,
+                'noMilestones' => "No milestones in the next {$horizonDays} days.",
+                'unassigned' => self::COPY_UNASSIGNED,
+            ],
         ];
     }
 
@@ -221,14 +233,16 @@ class ReportService
     {
         $db = Database::getInstance();
         $rows = $db->query(
-            'SELECT id, generated_at, type, triggered_by FROM reports ORDER BY generated_at DESC, id DESC'
+            'SELECT r.id, r.generated_at, r.type, r.triggered_by, u.display_name AS triggered_by_name
+             FROM reports r LEFT JOIN users u ON r.triggered_by = u.id
+             ORDER BY r.generated_at DESC, r.id DESC'
         )->fetchAll();
 
         return array_map(fn($r) => [
             'id' => $r['id'],
             'generatedAt' => date('c', strtotime($r['generated_at'])),
             'type' => $r['type'],
-            'triggeredBy' => $r['triggered_by'],
+            'triggeredBy' => self::triggeredBy($r),
         ], $rows);
     }
 
@@ -237,7 +251,10 @@ class ReportService
     {
         $db = Database::getInstance();
         $stmt = $db->prepare(
-            'SELECT id, generated_at, type, triggered_by, window_days, payload_json FROM reports WHERE id = :id'
+            'SELECT r.id, r.generated_at, r.type, r.triggered_by, r.window_days, r.payload_json,
+                    u.display_name AS triggered_by_name
+             FROM reports r LEFT JOIN users u ON r.triggered_by = u.id
+             WHERE r.id = :id'
         );
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch();
@@ -250,10 +267,18 @@ class ReportService
             'id' => $row['id'],
             'generatedAt' => date('c', strtotime($row['generated_at'])),
             'type' => $row['type'],
-            'triggeredBy' => $row['triggered_by'],
+            'triggeredBy' => self::triggeredBy($row),
             'windowDays' => (int) $row['window_days'],
             'payload' => json_decode($row['payload_json'], true),
         ];
+    }
+
+    /** Shape the triggerer for a byline: {id, displayName} or null (departed user). */
+    private static function triggeredBy(array $row): ?array
+    {
+        return $row['triggered_by'] !== null
+            ? ['id' => $row['triggered_by'], 'displayName' => $row['triggered_by_name']]
+            : null;
     }
 
     /** GET /reports/{id}/markdown — the stored markdown. */

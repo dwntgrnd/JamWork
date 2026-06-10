@@ -109,6 +109,28 @@ final class StatusReportMarkdownTest extends TestCase
         $this->assertStringContainsString('No active tasks.', $md2);
     }
 
+    public function testRendererReadsCopyFromPayload(): void
+    {
+        // The renderer must render empty-state copy + the Unassigned label FROM the
+        // payload, so markdown and the in-app view share one source and can't drift.
+        $payload = $this->payload([], []);
+        $payload['copy']['noProjects'] = 'CUSTOM NO PROJECTS';
+        $payload['copy']['noMilestones'] = 'CUSTOM NO MILESTONES';
+        $md = ReportMarkdownRenderer::render($payload);
+        $this->assertStringContainsString('CUSTOM NO PROJECTS', $md);
+        $this->assertStringContainsString('CUSTOM NO MILESTONES', $md);
+
+        $payload2 = $this->payload(
+            [$this->project('Ghost', [$this->task('old', 'done', ['completed_at' => $this->daysFromNow(-30)])])]
+        );
+        $payload2['copy']['noActiveTasks'] = 'CUSTOM NO TASKS';
+        $this->assertStringContainsString('CUSTOM NO TASKS', ReportMarkdownRenderer::render($payload2));
+
+        $payload3 = $this->payload([$this->project('Apollo', [$this->task('t1', 'todo')])]);
+        $payload3['copy']['unassigned'] = 'CUSTOM UNASSIGNED';
+        $this->assertStringContainsString('CUSTOM UNASSIGNED', ReportMarkdownRenderer::render($payload3));
+    }
+
     public function testStructuralParityWithPayload(): void
     {
         $payload = $this->payload([

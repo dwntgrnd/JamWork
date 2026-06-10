@@ -79,7 +79,11 @@ final class ReportRoutesTest extends IntegrationTestCase
         $report = $this->decode($res)['report'];
         $this->assertTrue(Uuid::isValid($report['id']));
         $this->assertSame('ad_hoc', $report['type']);
-        $this->assertSame($this->user['id'], $report['triggeredBy']);
+        $this->assertSame(
+            ['id' => $this->user['id'], 'displayName' => 'Doren Berge'],
+            $report['triggeredBy'],
+            'triggeredBy carries the byline name'
+        );
         $this->assertSame(7, $report['windowDays']);
         $this->assertContains('Live task', $this->payloadTaskTitles($report['payload']));
 
@@ -213,8 +217,26 @@ final class ReportRoutesTest extends IntegrationTestCase
         $this->assertCount(3, $reports);
         $this->assertSame('2026-06-03', substr($reports[0]['generatedAt'], 0, 10), 'newest first');
         $this->assertSame('scheduled', $reports[0]['type']);
-        $this->assertSame($this->user['id'], $reports[0]['triggeredBy']);
+        $this->assertSame(
+            ['id' => $this->user['id'], 'displayName' => 'Doren Berge'],
+            $reports[0]['triggeredBy']
+        );
         $this->assertSame('2026-06-01', substr($reports[2]['generatedAt'], 0, 10));
+    }
+
+    public function testTriggeredByIsNullWhenNoTriggerer(): void
+    {
+        // ON DELETE SET NULL: a departed user's reports survive with a null trigger.
+        $this->db->prepare(
+            'INSERT INTO reports (id, generated_at, type, triggered_by, window_days, payload_json, markdown)
+             VALUES (:id, :g, :t, NULL, 7, :p, :m)'
+        )->execute([
+            'id' => Uuid::uuid4()->toString(), 'g' => '2026-06-05 09:00:00',
+            't' => 'scheduled', 'p' => '{}', 'm' => '# x',
+        ]);
+
+        $reports = $this->decode($this->request('GET', '/reports', null, $this->token))['reports'];
+        $this->assertNull($reports[0]['triggeredBy'], 'null trigger renders as null, not an object');
     }
 
     // --- Fetch payload + markdown ----------------------------------------

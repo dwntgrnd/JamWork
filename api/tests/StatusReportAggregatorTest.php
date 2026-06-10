@@ -177,4 +177,22 @@ final class StatusReportAggregatorTest extends TestCase
         $this->assertFalse($payload['projects'][0]['hasTasks'], 'no renderable tasks -> hasTasks false');
         $this->assertSame([], $payload['projects'][0]['groups']);
     }
+
+    public function testBuildPayloadEmbedsRenderedCopy(): void
+    {
+        // Empty-state strings + the Unassigned label live in the payload so the
+        // frontend reads them directly (no independent client copy decisions).
+        $payload = ReportService::buildPayload([], [], self::NOW, 7, 90);
+
+        $this->assertSame([
+            'noProjects' => 'No projects are included in the status report.',
+            'noActiveTasks' => 'No active tasks.',
+            'noMilestones' => 'No milestones in the next 90 days.',
+            'unassigned' => 'Unassigned',
+        ], $payload['copy']);
+
+        // noMilestones reflects the actual horizon.
+        $payload30 = ReportService::buildPayload([], [], self::NOW, 7, 30);
+        $this->assertSame('No milestones in the next 30 days.', $payload30['copy']['noMilestones']);
+    }
 }
