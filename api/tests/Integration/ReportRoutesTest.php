@@ -364,4 +364,49 @@ final class ReportRoutesTest extends IntegrationTestCase
         $this->assertSame(401, $this->request('GET', "/reports/{$fakeId}", null, null)->getStatusCode());
         $this->assertSame(401, $this->request('GET', "/reports/{$fakeId}/markdown", null, null)->getStatusCode());
     }
+
+    // --- Delete (admin-only hard delete) ----------------------------------
+
+    public function testAdminDeleteRemovesReport(): void
+    {
+        $admin = $this->seedUser(['display_name' => 'Admin', 'role' => 'admin']);
+        $adminToken = $this->tokenFor($admin);
+
+        $id = $this->decode($this->request('POST', '/reports', null, $this->token))['report']['id'];
+
+        $res = $this->request('DELETE', "/reports/{$id}", null, $adminToken);
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame('Report deleted successfully', $this->decode($res)['message']);
+
+        $count = (int) $this->db->query('SELECT COUNT(*) FROM reports')->fetchColumn();
+        $this->assertSame(0, $count, 'the report row is hard-deleted');
+        $this->assertSame(404, $this->request('GET', "/reports/{$id}", null, $this->token)->getStatusCode());
+    }
+
+    public function testDeleteForbiddenForNonAdmin(): void
+    {
+        $id = $this->decode($this->request('POST', '/reports', null, $this->token))['report']['id'];
+
+        // The default user is a member, not an admin.
+        $res = $this->request('DELETE', "/reports/{$id}", null, $this->token);
+        $this->assertSame(403, $res->getStatusCode());
+
+        $count = (int) $this->db->query('SELECT COUNT(*) FROM reports')->fetchColumn();
+        $this->assertSame(1, $count, 'the report survives a non-admin delete attempt');
+    }
+
+    public function testDeleteRejectsUnauthenticated(): void
+    {
+        $fakeId = Uuid::uuid4()->toString();
+        $this->assertSame(401, $this->request('DELETE', "/reports/{$fakeId}", null, null)->getStatusCode());
+    }
+
+    public function testDeleteNotFound404(): void
+    {
+        $admin = $this->seedUser(['display_name' => 'Admin', 'role' => 'admin']);
+        $adminToken = $this->tokenFor($admin);
+
+        $res = $this->request('DELETE', '/reports/' . Uuid::uuid4(), null, $adminToken);
+        $this->assertSame(404, $res->getStatusCode());
+    }
 }

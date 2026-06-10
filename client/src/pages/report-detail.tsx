@@ -1,17 +1,25 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
-import { useReport } from '@/hooks/use-reports';
+import { Link, useParams, useNavigate } from 'react-router';
+import { useReport, useDeleteReport } from '@/hooks/use-reports';
+import { useAuth } from '@/hooks/use-auth';
 import { downloadReportMarkdown } from '@/lib/download';
+import { getErrorMessage } from '@/lib/api';
 import { reportTypeLabel, formatReportDateTime, triggeredByLabel } from '@/lib/report-format';
 import { ReportView } from '@/components/report/report-view';
+import { DeleteReportDialog } from '@/components/report/delete-report-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ReportDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const { data: report, isPending, isError, refetch } = useReport(id);
+  const deleteReport = useDeleteReport();
+  const [showDelete, setShowDelete] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
   const handleDownload = async () => {
@@ -24,6 +32,17 @@ export default function ReportDetailPage() {
     } finally {
       setDownloading(false);
     }
+  };
+
+  const handleConfirmDelete = () => {
+    if (!id) return;
+    deleteReport.mutate(id, {
+      onSuccess: () => {
+        toast.success('Report deleted');
+        navigate('/reports');
+      },
+      onError: (err) => toast.error(getErrorMessage(err, 'Failed to delete report')),
+    });
   };
 
   return (
@@ -61,16 +80,31 @@ export default function ReportDetailPage() {
                   {report.triggeredBy && <span>{triggeredByLabel(report.triggeredBy)}</span>}
                 </div>
               </div>
-              <Button variant="outline" onClick={handleDownload} disabled={downloading}>
-                {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Download Markdown
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button variant="outline" onClick={handleDownload} disabled={downloading}>
+                  {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  Download Markdown
+                </Button>
+                {isAdmin && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDelete(true)}
+                    disabled={deleteReport.isPending}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </Button>
+                )}
+              </div>
             </div>
 
             <ReportView payload={report.payload} />
           </>
         )}
       </div>
+
+      <DeleteReportDialog open={showDelete} onOpenChange={setShowDelete} onConfirm={handleConfirmDelete} />
     </div>
   );
 }

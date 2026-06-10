@@ -3,6 +3,7 @@
 namespace JamWork\Routes;
 
 use JamWork\Lib\Validator;
+use JamWork\Middleware\AdminMiddleware;
 use JamWork\Middleware\AuthMiddleware;
 use JamWork\Services\ReportService;
 use JamWork\Services\ServiceException;
@@ -68,6 +69,22 @@ class ReportRoutes
 
                 return self::json($response, ['report' => $report]);
             });
+
+            // DELETE /reports/{id} — admin-only hard delete
+            $group->delete('/{id}', function (Request $request, Response $response, array $args) {
+                $id = $args['id'];
+                if (!Validator::isUuid($id)) {
+                    return self::json($response, ['error' => 'id must be a valid UUID'], 400);
+                }
+
+                try {
+                    ReportService::deleteReport($id);
+                } catch (ServiceException $e) {
+                    return self::json($response, ['error' => $e->getMessage()], $e->getStatusCode());
+                }
+
+                return self::json($response, ['message' => 'Report deleted successfully']);
+            })->add(new AdminMiddleware());
 
         })->add(new AuthMiddleware());
     }

@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { apiGet } from '@/lib/api';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { apiDelete, apiGet } from '@/lib/api';
 import { queryClient } from '@/lib/query-client';
 import { ReportSummary, ReportDetail } from '@/types/report';
 
@@ -32,4 +32,12 @@ export function useReport(id: string | undefined) {
 /** Refetch every report query everywhere it's used. Safe to call from any handler. */
 export function invalidateReports(): Promise<void> {
   return queryClient.invalidateQueries({ queryKey: REPORTS_KEY });
+}
+
+/** Hard-delete a report (admin-only on the server). Refreshes the archive on success. */
+export function useDeleteReport() {
+  return useMutation({
+    mutationFn: (id: string) => apiDelete<{ message: string }>(`/reports/${id}`),
+    onSuccess: () => invalidateReports(),
+  });
 }

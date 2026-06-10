@@ -83,8 +83,11 @@ export function ReportView({ payload }: { payload: ReportPayload }) {
       {payload.projectsEmpty ? (
         <p className="text-sm text-muted-foreground">{copy.noProjects}</p>
       ) : (
-        payload.projects.map((project) => (
-          <section key={project.id}>
+        payload.projects.map((project, index) => (
+          <section
+            key={project.id}
+            className={index > 0 ? "border-t border-border pt-8" : undefined}
+          >
             <h2 className="text-xl font-bold text-foreground">{project.name}</h2>
             {!project.hasTasks ? (
               <p className="mt-1 text-sm text-muted-foreground">{copy.noActiveTasks}</p>
