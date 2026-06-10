@@ -81,3 +81,19 @@ export interface ReportDetail {
   windowDays: number;
   payload: ReportPayload;
 }
+
+/** Scheduled-delivery config — GET/PUT /admin/report-schedule. UTC only. */
+export interface ReportSchedule {
+  enabled: boolean;
+  dayOfWeek: number; // 1=Monday .. 7=Sunday (ISO 8601)
+  sendTimeUtc: string; // "HH:MM" in UTC
+  frequency: string; // "weekly" (only option for now; read, never hardcode)
+}
+
+/** One recipient row — GET /admin/report-recipients. */
+export interface ReportRecipient {
+  userId: string;
+  displayName: string;
+  email: string;
+  enabled: boolean;
+}

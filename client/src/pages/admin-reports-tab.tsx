@@ -1,14 +1,11 @@
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AdminReportsScheduleCard } from './admin-reports-schedule-card';
+import { AdminReportsRecipientsCard } from './admin-reports-recipients-card';
 
 export function AdminReportsTab() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Scheduled Reports</CardTitle>
-        <CardDescription>
-          Automated status report delivery — coming soon.
-        </CardDescription>
-      </CardHeader>
-    </Card>
+    <div className="space-y-6">
+      <AdminReportsScheduleCard />
+      <AdminReportsRecipientsCard />
+    </div>
   );
 }
