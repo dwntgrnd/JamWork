@@ -32,6 +32,10 @@ class Bootstrap
      */
     public static function createApp(): App
     {
+        // Pin PHP to UTC so date/time math aligns with the UTC-pinned DB session
+        // (Database.php). Both halves are required for correct Done-window/overdue.
+        date_default_timezone_set('UTC');
+
         $app = AppFactory::create();
         $app->setBasePath('/api');
 

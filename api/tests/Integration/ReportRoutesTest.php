@@ -42,6 +42,19 @@ final class ReportRoutesTest extends IntegrationTestCase
             ->execute(['id' => $projectId]);
     }
 
+    private function seedSubtask(string $taskId, bool $completed): void
+    {
+        $this->db->prepare(
+            'INSERT INTO subtasks (id, title, completed, sort_order, task_id)
+             VALUES (:id, :title, :completed, 0, :task_id)'
+        )->execute([
+            'id' => Uuid::uuid4()->toString(),
+            'title' => 'sub',
+            'completed' => $completed ? 1 : 0,
+            'task_id' => $taskId,
+        ]);
+    }
+
     private function daysAgo(int $days): string
     {
         return date('Y-m-d H:i:s', time() - $days * 86400);
@@ -288,6 +301,29 @@ final class ReportRoutesTest extends IntegrationTestCase
                 }
             }
         }
+    }
+
+    // --- Subtask counts + assignees (exercises the IN-clause fetch paths) --
+
+    public function testPayloadCarriesSubtaskCountsAndAssignees(): void
+    {
+        $projectId = $this->seedProject($this->user['id'], ['name' => 'Apollo']);
+        $taskId = $this->seedTask($projectId, $this->user['id'], ['title' => 'With detail', 'status' => 'todo']);
+        $this->seedSubtask($taskId, true);
+        $this->seedSubtask($taskId, false);
+        $this->assignTask($taskId, $this->user['id']);
+
+        $res = $this->request('POST', '/reports', null, $this->token);
+        $payload = $this->decode($res)['report']['payload'];
+
+        // payload_json is a MySQL JSON column, which normalizes object key order;
+        // assert by key, not by array shape (list order is preserved, key order is not).
+        $task = $payload['projects'][0]['groups'][0]['tasks'][0];
+        $this->assertSame(1, $task['subtasks']['completed']);
+        $this->assertSame(2, $task['subtasks']['total']);
+        $this->assertCount(1, $task['assignees']);
+        $this->assertSame($this->user['id'], $task['assignees'][0]['id']);
+        $this->assertSame('Doren Berge', $task['assignees'][0]['name']);
     }
 
     // --- Empty states -----------------------------------------------------

@@ -3,6 +3,7 @@
 namespace JamWork\Services;
 
 use JamWork\Lib\Database;
+use JamWork\Models\TaskModel;
 use PDO;
 use Ramsey\Uuid\Uuid;
 
@@ -322,7 +323,7 @@ class ReportService
         if (empty($taskIds)) {
             return [];
         }
-        $in = self::inClause($taskIds, 'st');
+        $in = TaskModel::buildInClause($taskIds, 'st');
         $stmt = $db->prepare(
             "SELECT task_id, COUNT(*) AS total, SUM(completed) AS completed
              FROM subtasks WHERE task_id IN ({$in['clause']}) GROUP BY task_id"
@@ -341,7 +342,7 @@ class ReportService
         if (empty($taskIds)) {
             return [];
         }
-        $in = self::inClause($taskIds, 'as');
+        $in = TaskModel::buildInClause($taskIds, 'as');
         $stmt = $db->prepare(
             "SELECT ta.task_id, u.id AS user_id, u.display_name
              FROM task_assignees ta JOIN users u ON ta.user_id = u.id
@@ -355,18 +356,5 @@ class ReportService
             $out[$r['task_id']][] = ['id' => $r['user_id'], 'name' => $r['display_name']];
         }
         return $out;
-    }
-
-    /** Build a positional IN clause with named placeholders. */
-    private static function inClause(array $ids, string $prefix): array
-    {
-        $placeholders = [];
-        $params = [];
-        foreach (array_values($ids) as $i => $id) {
-            $key = "{$prefix}{$i}";
-            $placeholders[] = ":{$key}";
-            $params[$key] = $id;
-        }
-        return ['clause' => implode(', ', $placeholders), 'params' => $params];
     }
 }

@@ -31,7 +31,7 @@ class ProjectRoutes
             'startDate' => $row['start_date'] ? date('c', strtotime($row['start_date'])) : null,
             'endDate' => $row['end_date'] ? date('c', strtotime($row['end_date'])) : null,
             'sprintPlanning' => (bool) $row['sprint_planning'],
-            'includeInStatusReport' => (bool) $row['include_in_status_report'],
+            'includeInStatusReport' => (bool) ($row['include_in_status_report'] ?? 1),
             'defaultNotifyEnabled' => (bool) ($row['default_notify_enabled'] ?? 1),
             'createdAt' => date('c', strtotime($row['created_at'])),
             'updatedAt' => date('c', strtotime($row['updated_at'])),
