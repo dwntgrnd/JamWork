@@ -8,11 +8,13 @@ use JamWork\Middleware\NoCacheMiddleware;
 use JamWork\Middleware\RateLimitMiddleware;
 use JamWork\Routes\AdminRoutes;
 use JamWork\Routes\AuthRoutes;
+use JamWork\Routes\CronRoutes;
 use JamWork\Routes\WorkspaceSettingsRoutes;
 use JamWork\Routes\ProjectRoutes;
 use JamWork\Routes\LabelRoutes;
 use JamWork\Routes\MilestoneRoutes;
 use JamWork\Routes\ReportRoutes;
+use JamWork\Routes\ReportScheduleRoutes;
 use JamWork\Routes\TaskLinkRoutes;
 use JamWork\Routes\SprintRoutes;
 use JamWork\Routes\TaskRoutes;
@@ -81,6 +83,8 @@ class Bootstrap
         SprintRoutes::register($app);
         TaskRoutes::register($app);
         ReportRoutes::register($app);
+        ReportScheduleRoutes::register($app);
+        CronRoutes::register($app);
 
         return $app;
     }
