@@ -136,13 +136,20 @@ class ReportService
     /**
      * Assemble the full, self-sufficient payload from fetched project + milestone
      * data. $projectsData entries: ['id','name','tasks','subtaskCounts','assignees'].
+     *
+     * $eligibleProjectCount marks a project-filtered report (CC36): when non-null
+     * the report was scoped to a subset of the report-eligible projects, and a
+     * `scope` block is embedded carrying a human-readable note (M = the passed
+     * value, N = the number of included projects). Null = a full report (no
+     * scope block; the absence of the note means "everything").
      */
     public static function buildPayload(
         array $projectsData,
         array $milestoneRows,
         int $nowTs,
         int $windowDays = self::DEFAULT_WINDOW_DAYS,
-        int $horizonDays = self::DEFAULT_HORIZON_DAYS
+        int $horizonDays = self::DEFAULT_HORIZON_DAYS,
+        ?int $eligibleProjectCount = null
     ): array {
         $projects = [];
         foreach ($projectsData as $pd) {
@@ -161,7 +168,7 @@ class ReportService
             ];
         }
 
-        return [
+        $payload = [
             'generatedAt' => date('c', $nowTs),
             'windowDays' => $windowDays,
             'milestoneHorizonDays' => $horizonDays,
@@ -175,6 +182,20 @@ class ReportService
                 'unassigned' => self::COPY_UNASSIGNED,
             ],
         ];
+
+        if ($eligibleProjectCount !== null) {
+            $includedCount = count($projects);
+            $names = array_map(fn($p) => $p['name'], $projects);
+            $payload['scope'] = [
+                'isFiltered' => true,
+                'includedProjectCount' => $includedCount,
+                'eligibleProjectCount' => $eligibleProjectCount,
+                'note' => "This report includes {$includedCount} of {$eligibleProjectCount} eligible projects: "
+                    . implode(', ', $names) . '.',
+            ];
+        }
+
+        return $payload;
     }
 
     // --- Generation + persistence (DB) --------------------------------------
@@ -188,13 +209,22 @@ class ReportService
         ?string $userId,
         int $windowDays = self::DEFAULT_WINDOW_DAYS,
         int $horizonDays = self::DEFAULT_HORIZON_DAYS,
-        string $type = 'ad_hoc'
+        string $type = 'ad_hoc',
+        ?array $projectIds = null
     ): array {
         $db = Database::getInstance();
         $nowTs = time();
 
+        // Optional project filtering (CC36, ad hoc only). An empty/omitted list is
+        // a full report; a non-empty list is validated against current eligibility
+        // and narrows the set (preserving name order). Scheduled reports never pass
+        // $projectIds, so they always include every eligible project.
+        $eligible = self::fetchIncludedProjects($db);
+        $isFiltered = $projectIds !== null && $projectIds !== [];
+        $selected = $isFiltered ? self::resolveSelectedProjects($eligible, $projectIds) : $eligible;
+
         $projectsData = [];
-        foreach (self::fetchIncludedProjects($db) as $project) {
+        foreach ($selected as $project) {
             $tasks = self::fetchTasks($db, $project['id']);
             $taskIds = array_column($tasks, 'id');
             $projectsData[] = [
@@ -209,13 +239,23 @@ class ReportService
         // Global milestones — reuse the existing unscoped read (all milestones).
         $milestoneRows = $db->query('SELECT name, date FROM milestones ORDER BY date ASC')->fetchAll();
 
-        $payload = self::buildPayload($projectsData, $milestoneRows, $nowTs, $windowDays, $horizonDays);
+        $eligibleCount = count($eligible);
+        $payload = self::buildPayload(
+            $projectsData,
+            $milestoneRows,
+            $nowTs,
+            $windowDays,
+            $horizonDays,
+            $isFiltered ? $eligibleCount : null
+        );
         $markdown = ReportMarkdownRenderer::render($payload);
 
         $id = Uuid::uuid4()->toString();
         $stmt = $db->prepare(
-            'INSERT INTO reports (id, generated_at, type, triggered_by, window_days, payload_json, markdown)
-             VALUES (:id, :generated_at, :type, :triggered_by, :window_days, :payload_json, :markdown)'
+            'INSERT INTO reports (id, generated_at, type, triggered_by, window_days, payload_json, markdown,
+                                  is_filtered, included_project_count, eligible_project_count)
+             VALUES (:id, :generated_at, :type, :triggered_by, :window_days, :payload_json, :markdown,
+                     :is_filtered, :included_project_count, :eligible_project_count)'
         );
         $stmt->execute([
             'id' => $id,
@@ -225,9 +265,35 @@ class ReportService
             'window_days' => $windowDays,
             'payload_json' => json_encode($payload),
             'markdown' => $markdown,
+            'is_filtered' => $isFiltered ? 1 : 0,
+            'included_project_count' => $isFiltered ? count($projectsData) : null,
+            'eligible_project_count' => $isFiltered ? $eligibleCount : null,
         ]);
 
         return self::get($id);
+    }
+
+    /**
+     * Restrict the eligible project list to $projectIds, preserving the eligible
+     * (name) order and de-duplicating. Every requested id must be a currently
+     * report-eligible project — a stale or ineligible id is a 400, never a silent
+     * drop, so stale client state surfaces as an explicit error.
+     *
+     * @param array<int,array{id:string,name:string}> $eligible
+     * @param array<int,mixed> $projectIds
+     * @return array<int,array{id:string,name:string}>
+     */
+    private static function resolveSelectedProjects(array $eligible, array $projectIds): array
+    {
+        $eligibleById = array_column($eligible, null, 'id');
+        foreach ($projectIds as $pid) {
+            if (!is_string($pid) || !isset($eligibleById[$pid])) {
+                throw new ServiceException(400, 'One or more selected projects are not eligible for the status report.');
+            }
+        }
+
+        $wanted = array_flip($projectIds);
+        return array_values(array_filter($eligible, fn($p) => isset($wanted[$p['id']])));
     }
 
     /** GET /reports — archive list, newest-first. */
@@ -235,7 +301,9 @@ class ReportService
     {
         $db = Database::getInstance();
         $rows = $db->query(
-            'SELECT r.id, r.generated_at, r.type, r.triggered_by, u.display_name AS triggered_by_name
+            'SELECT r.id, r.generated_at, r.type, r.triggered_by,
+                    r.is_filtered, r.included_project_count, r.eligible_project_count,
+                    u.display_name AS triggered_by_name
              FROM reports r LEFT JOIN users u ON r.triggered_by = u.id
              ORDER BY r.generated_at DESC, r.id DESC'
         )->fetchAll();
@@ -245,6 +313,9 @@ class ReportService
             'generatedAt' => date('c', strtotime($r['generated_at'])),
             'type' => $r['type'],
             'triggeredBy' => self::triggeredBy($r),
+            'isFiltered' => (bool) $r['is_filtered'],
+            'includedProjectCount' => $r['included_project_count'] !== null ? (int) $r['included_project_count'] : null,
+            'eligibleProjectCount' => $r['eligible_project_count'] !== null ? (int) $r['eligible_project_count'] : null,
         ], $rows);
     }
 

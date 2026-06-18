@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useReports, invalidateReports, useDeleteReport } from '@/hooks/use-reports';
+import { useProjects } from '@/hooks/use-projects';
 import { useAuth } from '@/hooks/use-auth';
 import { apiPost, getErrorMessage } from '@/lib/api';
 import { reportTypeLabel, formatReportDateTime, triggeredByLabel } from '@/lib/report-format';
 import { DeleteReportDialog } from '@/components/report/delete-report-dialog';
+import { ReportProjectPickerDialog } from '@/components/report/report-project-picker-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Loader2, Plus, Trash2 } from 'lucide-react';
+import { FileText, ListFilter, Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ReportDetail, ReportSummary } from '@/types/report';
 import { isAdminOrOwner } from '@/types';
@@ -17,9 +19,16 @@ export default function ReportsPage() {
   const { user } = useAuth();
   const isAdmin = isAdminOrOwner(user?.role);
   const { data: reports, isPending, isError, refetch } = useReports();
+  const { data: projects } = useProjects();
   const deleteReport = useDeleteReport();
   const [toDelete, setToDelete] = useState<ReportSummary | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Report-eligible projects power the picker; the filter link only appears when
+  // there are 2+ to choose between (nothing meaningful to narrow otherwise).
+  const eligibleProjects = (projects ?? []).filter((p) => p.includeInStatusReport !== false);
+  const canFilter = eligibleProjects.length >= 2;
 
   const handleConfirmDelete = () => {
     if (!toDelete) return;
@@ -29,10 +38,15 @@ export default function ReportsPage() {
     });
   };
 
-  const handleGenerate = async () => {
+  // projectIds === a subset → filtered report; null/undefined → full report
+  // (the one-click path stays a body-less POST, identical to before CC36).
+  const handleGenerate = async (projectIds?: string[] | null) => {
     setGenerating(true);
     try {
-      const { report } = await apiPost<{ report: ReportDetail }>('/reports');
+      const { report } =
+        projectIds && projectIds.length
+          ? await apiPost<{ report: ReportDetail }>('/reports', { projectIds })
+          : await apiPost<{ report: ReportDetail }>('/reports');
       await invalidateReports();
       navigate(`/reports/${report.id}`);
     } catch (err) {
@@ -50,10 +64,28 @@ export default function ReportsPage() {
             <h1 className="text-3xl font-bold text-foreground">Status Reports</h1>
             <p className="mt-1 text-sm text-muted-foreground">A shared snapshot of work across all projects.</p>
           </div>
-          <Button variant="emphasis" className="gap-2 font-semibold" onClick={handleGenerate} disabled={generating}>
-            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Generate Report
-          </Button>
+          <div className="flex flex-col items-end gap-1.5">
+            <Button
+              variant="emphasis"
+              className="gap-2 font-semibold"
+              onClick={() => handleGenerate()}
+              disabled={generating}
+            >
+              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Generate Report
+            </Button>
+            {canFilter && (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                disabled={generating}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline disabled:opacity-50"
+              >
+                <ListFilter className="h-3.5 w-3.5" />
+                Choose specific projects
+              </button>
+            )}
+          </div>
         </div>
 
         {isPending ? (
@@ -91,9 +123,14 @@ export default function ReportsPage() {
                       <span className="ml-2 text-sm text-muted-foreground">{triggeredByLabel(report.triggeredBy)}</span>
                     )}
                   </div>
-                  <Badge variant="secondary" className="shrink-0">
-                    {reportTypeLabel(report.type)}
-                  </Badge>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Badge variant="secondary">{reportTypeLabel(report.type)}</Badge>
+                    {report.isFiltered && (
+                      <Badge variant="outline">
+                        Filtered ({report.includedProjectCount} of {report.eligibleProjectCount} projects)
+                      </Badge>
+                    )}
+                  </div>
                 </Link>
                 {isAdmin && (
                   <button
@@ -116,6 +153,13 @@ export default function ReportsPage() {
         open={!!toDelete}
         onOpenChange={(open) => !open && setToDelete(null)}
         onConfirm={handleConfirmDelete}
+      />
+
+      <ReportProjectPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        projects={eligibleProjects}
+        onGenerate={handleGenerate}
       />
     </div>
   );

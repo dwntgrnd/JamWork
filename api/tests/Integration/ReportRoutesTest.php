@@ -368,6 +368,99 @@ final class ReportRoutesTest extends IntegrationTestCase
         $this->assertFalse($projects[0]['hasTasks']);
     }
 
+    // --- Ad hoc project selection (CC36) ----------------------------------
+
+    public function testFilteredGenerationIncludesOnlySelectedProjectsWithScope(): void
+    {
+        $apollo = $this->seedProject($this->user['id'], ['name' => 'Apollo']);
+        $gemini = $this->seedProject($this->user['id'], ['name' => 'Gemini']);
+        $orion  = $this->seedProject($this->user['id'], ['name' => 'Orion']);
+        $this->seedTask($apollo, $this->user['id'], ['title' => 'Apollo task', 'status' => 'todo']);
+        $this->seedTask($gemini, $this->user['id'], ['title' => 'Gemini task', 'status' => 'todo']);
+        $this->seedTask($orion, $this->user['id'], ['title' => 'Orion task', 'status' => 'todo']);
+
+        $res = $this->request('POST', '/reports', ['projectIds' => [$apollo, $orion]], $this->token);
+        $this->assertSame(201, $res->getStatusCode());
+        $payload = $this->decode($res)['report']['payload'];
+
+        $this->assertSame(['Apollo', 'Orion'], array_column($payload['projects'], 'name'), 'only selected projects, in name order');
+        $this->assertTrue($payload['scope']['isFiltered']);
+        $this->assertSame(2, $payload['scope']['includedProjectCount']);
+        $this->assertSame(3, $payload['scope']['eligibleProjectCount']);
+        $this->assertSame(
+            'This report includes 2 of 3 eligible projects: Apollo, Orion.',
+            $payload['scope']['note']
+        );
+    }
+
+    public function testFilteredGenerationStoresMetadataReturnedByArchiveList(): void
+    {
+        $apollo = $this->seedProject($this->user['id'], ['name' => 'Apollo']);
+        $this->seedProject($this->user['id'], ['name' => 'Gemini']);
+
+        $this->assertSame(201, $this->request('POST', '/reports', ['projectIds' => [$apollo]], $this->token)->getStatusCode());
+
+        $reports = $this->decode($this->request('GET', '/reports', null, $this->token))['reports'];
+        $this->assertCount(1, $reports);
+        $this->assertTrue($reports[0]['isFiltered']);
+        $this->assertSame(1, $reports[0]['includedProjectCount']);
+        $this->assertSame(2, $reports[0]['eligibleProjectCount']);
+    }
+
+    public function testFilteredMarkdownCarriesScopeNote(): void
+    {
+        $apollo = $this->seedProject($this->user['id'], ['name' => 'Apollo']);
+        $this->seedProject($this->user['id'], ['name' => 'Gemini']);
+        $id = $this->decode($this->request('POST', '/reports', ['projectIds' => [$apollo]], $this->token))['report']['id'];
+
+        $md = (string) $this->request('GET', "/reports/{$id}/markdown", null, $this->token)->getBody();
+        $this->assertStringContainsString('> This report includes 1 of 2 eligible projects: Apollo.', $md);
+    }
+
+    public function testIneligibleOrUnknownProjectIdIsRejectedAndStoresNothing(): void
+    {
+        $apollo = $this->seedProject($this->user['id'], ['name' => 'Apollo']);
+        $excluded = $this->seedProject($this->user['id'], ['name' => 'Excluded']);
+        $this->excludeProject($excluded);
+
+        // An ineligible (excluded) project id -> 400.
+        $this->assertSame(400, $this->request('POST', '/reports', ['projectIds' => [$apollo, $excluded]], $this->token)->getStatusCode());
+        // A non-existent id -> 400.
+        $this->assertSame(400, $this->request('POST', '/reports', ['projectIds' => [Uuid::uuid4()->toString()]], $this->token)->getStatusCode());
+
+        $count = (int) $this->db->query('SELECT COUNT(*) FROM reports')->fetchColumn();
+        $this->assertSame(0, $count, 'a rejected request persists no report');
+    }
+
+    public function testEmptyProjectIdsArrayProducesFullReportWithNoScope(): void
+    {
+        $apollo = $this->seedProject($this->user['id'], ['name' => 'Apollo']);
+        $gemini = $this->seedProject($this->user['id'], ['name' => 'Gemini']);
+        $this->seedTask($apollo, $this->user['id'], ['title' => 'A']);
+        $this->seedTask($gemini, $this->user['id'], ['title' => 'B']);
+
+        $payload = $this->decode($this->request('POST', '/reports', ['projectIds' => []], $this->token))['report']['payload'];
+
+        $this->assertSame(['Apollo', 'Gemini'], array_column($payload['projects'], 'name'));
+        $this->assertArrayNotHasKey('scope', $payload, 'empty array is treated as a full report');
+
+        $reports = $this->decode($this->request('GET', '/reports', null, $this->token))['reports'];
+        $this->assertFalse($reports[0]['isFiltered']);
+        $this->assertNull($reports[0]['includedProjectCount']);
+        $this->assertNull($reports[0]['eligibleProjectCount']);
+    }
+
+    public function testUnfilteredGenerationIsNotMarkedFiltered(): void
+    {
+        $this->seedProject($this->user['id'], ['name' => 'Apollo']);
+        $this->request('POST', '/reports', null, $this->token);
+
+        $reports = $this->decode($this->request('GET', '/reports', null, $this->token))['reports'];
+        $this->assertFalse($reports[0]['isFiltered']);
+        $this->assertNull($reports[0]['includedProjectCount']);
+        $this->assertNull($reports[0]['eligibleProjectCount']);
+    }
+
     // --- Auth -------------------------------------------------------------
 
     public function testEndpointsRejectUnauthenticatedRequests(): void

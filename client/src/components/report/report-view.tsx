@@ -60,8 +60,14 @@ function StatusGroup({ group, unassigned }: { group: ReportGroup; unassigned: st
 export function ReportView({ payload }: { payload: ReportPayload }) {
   const { copy } = payload;
   return (
-    <div className="space-y-8">
-      {/* Milestone block — always present, rendered once for the whole report. */}
+    <div>
+      {/* Scope note (CC36) — present only for project-filtered reports. */}
+      {payload.scope?.isFiltered && (
+        <p className="mb-6 text-sm text-muted-foreground">{payload.scope.note}</p>
+      )}
+
+      <div className="space-y-8">
+        {/* Milestone block — always present, rendered once for the whole report. */}
       <section>
         <h2 className="text-xl font-bold text-foreground">
           Milestones (next {payload.milestoneHorizonDays} days)
@@ -99,6 +105,7 @@ export function ReportView({ payload }: { payload: ReportPayload }) {
           </section>
         ))
       )}
+      </div>
     </div>
   );
 }

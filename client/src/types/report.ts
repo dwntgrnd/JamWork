@@ -14,6 +14,11 @@ export interface ReportSummary {
   generatedAt: string; // ISO 8601
   type: string; // "ad_hoc" | "scheduled"
   triggeredBy: ReportTriggeredBy | null;
+  // Project-filter metadata (CC36). isFiltered is false and the counts are null
+  // for full reports, scheduled reports, and any report generated before CC36.
+  isFiltered?: boolean;
+  includedProjectCount?: number | null;
+  eligibleProjectCount?: number | null;
 }
 
 /** A global milestone inside the report payload. */
@@ -61,6 +66,15 @@ export interface ReportCopy {
   unassigned: string;
 }
 
+/** Scope metadata for a project-filtered report (CC36); absent on full reports. */
+export interface ReportScope {
+  isFiltered: boolean;
+  includedProjectCount: number;
+  eligibleProjectCount: number;
+  /** Pre-composed, human-readable note — render verbatim. */
+  note: string;
+}
+
 /** The stored payload — the rendering contract. Walk in the order given. */
 export interface ReportPayload {
   generatedAt: string; // ISO 8601
@@ -70,6 +84,7 @@ export interface ReportPayload {
   projects: ReportProject[];
   projectsEmpty: boolean;
   copy: ReportCopy;
+  scope?: ReportScope; // present only for filtered reports
 }
 
 /** Full stored object — GET /reports/{id}. */
