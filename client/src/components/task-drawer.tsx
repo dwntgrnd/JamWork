@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useMemo, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useMemo, type KeyboardEvent, type ReactNode } from 'react';
 import { apiGet, apiPost, apiPut, apiDelete, getErrorMessage } from '@/lib/api';
 import { invalidateProjects } from '@/hooks/use-projects';
 import {
@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import { AlertCircle, Check, Loader2, Pencil, Trash2, X } from 'lucide-react';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { SaveStatusIndicator } from '@/components/save-status-indicator';
@@ -115,6 +116,10 @@ export function TaskDrawer({
   // Form state
   const [title, setTitle] = useState(task?.title || '');
   const [description, setDescription] = useState(task?.description || '');
+  // Edit-mode description toggles between rendered markdown (read) and the
+  // textarea (write); create mode is always write. (CC35)
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [status, setStatus] = useState<TaskStatus>(
     task?.status || defaultStatus || 'todo'
   );
@@ -365,6 +370,15 @@ export function TaskDrawer({
       setDescription(task?.description || ''); // revert on failure
     }
   };
+
+  // When entering write state, focus the textarea and place the cursor at the end.
+  useEffect(() => {
+    if (isEditingDescription && textareaRef.current) {
+      const el = textareaRef.current;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  }, [isEditingDescription]);
 
   const handleStartDateChange = async (newValue: string) => {
     const prev = startDate;
@@ -930,30 +944,70 @@ export function TaskDrawer({
                 <label htmlFor="task-description" className="text-xs font-medium text-muted-foreground">
                   Description
                 </label>
-                <div className="group mt-1 -mx-2 flex items-start gap-1.5 rounded-md px-2 transition-colors cursor-text hover:bg-muted/40 focus-within:bg-transparent focus-within:ring-[3px] focus-within:ring-ring/50">
-                  <textarea
-                    id="task-description"
-                    value={description}
-                    onChange={(e) => {
-                      setDescription(e.target.value);
-                      // Auto-grow: reset height then set to scrollHeight
-                      e.target.style.height = 'auto';
-                      e.target.style.height = e.target.scrollHeight + 'px';
-                    }}
-                    onBlur={mode === 'edit' ? handleDescriptionBlur : undefined}
-                    placeholder="What needs to be done?"
-                    maxLength={5000}
-                    className="min-w-0 flex-1 min-h-[72px] resize-none border-0 bg-transparent py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                    ref={(el) => {
-                      // Set initial height on mount based on content
-                      if (el) {
-                        el.style.height = 'auto';
-                        el.style.height = el.scrollHeight + 'px';
+
+                {mode === 'edit' && !isEditingDescription ? (
+                  // Read state: rendered markdown (or placeholder) — click/Enter to edit.
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setIsEditingDescription(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setIsEditingDescription(true);
                       }
                     }}
-                  />
-                  <Pencil aria-hidden="true" className="pointer-events-none mt-2 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100" />
-                </div>
+                    className="group mt-1 -mx-2 flex items-start gap-1.5 rounded-md px-2 transition-colors cursor-pointer outline-none hover:bg-muted/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    {description.trim() ? (
+                      <MarkdownRenderer content={description} className="min-w-0 flex-1 min-h-[72px] py-1.5" />
+                    ) : (
+                      <span className="min-w-0 flex-1 min-h-[72px] py-1.5 text-sm text-muted-foreground">
+                        What needs to be done?
+                      </span>
+                    )}
+                    <Pencil aria-hidden="true" className="pointer-events-none mt-2 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100" />
+                  </div>
+                ) : (
+                  // Write state: the textarea (always in create mode) + a markdown hint.
+                  <>
+                    <div className="group mt-1 -mx-2 flex items-start gap-1.5 rounded-md px-2 transition-colors cursor-text hover:bg-muted/40 focus-within:bg-transparent focus-within:ring-[3px] focus-within:ring-ring/50">
+                      <textarea
+                        id="task-description"
+                        value={description}
+                        onChange={(e) => {
+                          setDescription(e.target.value);
+                          // Auto-grow: reset height then set to scrollHeight
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        onBlur={
+                          mode === 'edit'
+                            ? () => {
+                                handleDescriptionBlur();
+                                setIsEditingDescription(false);
+                              }
+                            : undefined
+                        }
+                        placeholder="What needs to be done?"
+                        maxLength={5000}
+                        className="min-w-0 flex-1 min-h-[72px] resize-none border-0 bg-transparent py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                        ref={(el) => {
+                          textareaRef.current = el;
+                          // Set initial height on mount based on content
+                          if (el) {
+                            el.style.height = 'auto';
+                            el.style.height = el.scrollHeight + 'px';
+                          }
+                        }}
+                      />
+                      <Pencil aria-hidden="true" className="pointer-events-none mt-2 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100" />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Supports **bold**, *italic*, lists, and [links](url)
+                    </p>
+                  </>
+                )}
               </div>
 
               {/* === SUBTASKS (edit mode only) === */}

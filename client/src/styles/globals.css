@@ -450,3 +450,83 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Scoped prose styles for rendered markdown (MarkdownRenderer). Token-only so
+   they track light/dark themes; restrained sizing because the description lives
+   inside a drawer, not a document. */
+@layer components {
+  .jw-prose {
+    @apply text-sm text-foreground;
+  }
+  .jw-prose > :first-child {
+    @apply mt-0;
+  }
+  .jw-prose > :last-child {
+    @apply mb-0;
+  }
+  .jw-prose h1 {
+    @apply mt-3 mb-2 text-lg font-semibold text-foreground;
+  }
+  .jw-prose h2 {
+    @apply mt-3 mb-2 text-base font-semibold text-foreground;
+  }
+  .jw-prose h3,
+  .jw-prose h4 {
+    @apply mt-2 mb-1 text-sm font-semibold text-foreground;
+  }
+  .jw-prose p {
+    @apply mb-2 text-sm text-foreground;
+  }
+  .jw-prose ul {
+    @apply mb-2 list-disc pl-5;
+  }
+  .jw-prose ol {
+    @apply mb-2 list-decimal pl-5;
+  }
+  .jw-prose li {
+    @apply mb-1 text-sm;
+  }
+  .jw-prose a {
+    @apply text-interactive underline-offset-2 hover:underline;
+  }
+  .jw-prose code {
+    @apply rounded bg-muted px-1 py-0.5 font-mono text-[0.85em];
+  }
+  .jw-prose pre {
+    @apply mb-2 overflow-x-auto rounded-md bg-muted p-3;
+  }
+  .jw-prose pre code {
+    @apply rounded-none bg-transparent p-0 text-sm;
+  }
+  .jw-prose blockquote {
+    @apply my-2 border-l-2 border-muted-foreground bg-muted/30 py-1 pl-3 text-muted-foreground;
+  }
+  .jw-prose hr {
+    @apply my-3 border-border;
+  }
+  .jw-prose table {
+    @apply my-2 w-full border-collapse text-sm;
+  }
+  .jw-prose th,
+  .jw-prose td {
+    @apply border border-border px-2 py-1 text-left;
+  }
+  .jw-prose th {
+    @apply font-semibold;
+  }
+  .jw-prose strong {
+    @apply font-semibold;
+  }
+  .jw-prose em {
+    @apply italic;
+  }
+  .jw-prose del {
+    @apply text-muted-foreground line-through;
+  }
+  .jw-prose input[type='checkbox'] {
+    @apply mr-1.5 align-middle;
+  }
+  .jw-prose li:has(> input[type='checkbox']) {
+    @apply list-none;
+  }
+}
