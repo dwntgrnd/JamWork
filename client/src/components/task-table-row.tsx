@@ -11,7 +11,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverTrigger,
@@ -19,7 +18,7 @@ import {
 } from "@/components/ui/popover";
 import { ChevronRight, ChevronDown, Check, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getDateUrgencyInfo } from "@/lib/date-utils";
+import { DueDatePicker } from "@/components/due-date-picker";
 import {
   getStatusChipClasses,
   getPriorityDotColor,
@@ -189,23 +188,23 @@ export function TaskTableRow({
             )}
           </TableCell>
 
-          {/* Project */}
-          {showProjectColumn && (
-            <TableCell className="hidden lg:table-cell">
-              {task.project ? (
-                <Link
-                  to={`/projects/${task.project.id}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-sm text-muted-foreground hover:text-foreground hover:underline truncate block max-w-[160px]"
-                  title={task.project.name}
-                >
-                  {task.project.name}
-                </Link>
-              ) : (
-                <span className="text-sm text-muted-foreground/50">&mdash;</span>
+          {/* Due Date - inline editable */}
+          <TableCell className="hidden sm:table-cell">
+            <div onClick={(e) => e.stopPropagation()}>
+              <DueDatePicker
+                value={task.dueDate}
+                status={task.status}
+                onChange={(v) =>
+                  onInlineEdit("dueDate", v ? new Date(v).toISOString() : null)
+                }
+                triggerClassName="h-7 px-1"
+                labelClassName="text-xs"
+              />
+              {savingFields.has(`${task.id}-dueDate`) && (
+                <Check className="h-3 w-3 text-success inline-block ml-1" />
               )}
-            </TableCell>
-          )}
+            </div>
+          </TableCell>
 
           {/* Status - inline editable */}
           <TableCell>
@@ -312,7 +311,7 @@ export function TaskTableRow({
           </TableCell>
 
           {/* Assignees - inline editable */}
-          <TableCell className="hidden sm:table-cell">
+          <TableCell className="hidden md:table-cell">
             <div onClick={(e) => e.stopPropagation()}>
               <Popover>
                 <PopoverTrigger asChild>
@@ -382,67 +381,23 @@ export function TaskTableRow({
             </div>
           </TableCell>
 
-          {/* Due Date - inline editable */}
-          <TableCell className="hidden md:table-cell">
-            <div onClick={(e) => e.stopPropagation()}>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button className="text-left h-7 px-1 rounded hover:bg-muted/50 transition-colors">
-                    {(() => {
-                      const urgency = getDateUrgencyInfo(
-                        task.dueDate,
-                        task.status,
-                      );
-                      return (
-                        <span
-                          className={cn(
-                            "text-xs whitespace-nowrap",
-                            urgency.className,
-                          )}
-                        >
-                          {urgency.label}
-                        </span>
-                      );
-                    })()}
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-3" align="start">
-                  <div className="flex flex-col gap-2">
-                    <Input
-                      type="date"
-                      value={
-                        task.dueDate
-                          ? new Date(task.dueDate).toISOString().split("T")[0]
-                          : ""
-                      }
-                      onChange={(e) =>
-                        onInlineEdit(
-                          "dueDate",
-                          e.target.value
-                            ? new Date(e.target.value).toISOString()
-                            : null,
-                        )
-                      }
-                      className="h-8 text-sm"
-                    />
-                    {task.dueDate && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs text-muted-foreground"
-                        onClick={() => onInlineEdit("dueDate", null)}
-                      >
-                        Clear
-                      </Button>
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
-              {savingFields.has(`${task.id}-dueDate`) && (
-                <Check className="h-3 w-3 text-success inline-block ml-1" />
+          {/* Project */}
+          {showProjectColumn && (
+            <TableCell className="hidden lg:table-cell">
+              {task.project ? (
+                <Link
+                  to={`/projects/${task.project.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-sm text-muted-foreground hover:text-foreground hover:underline truncate block max-w-[160px]"
+                  title={task.project.name}
+                >
+                  {task.project.name}
+                </Link>
+              ) : (
+                <span className="text-sm text-muted-foreground/50">&mdash;</span>
               )}
-            </div>
-          </TableCell>
+            </TableCell>
+          )}
         </TableRow>
       )}
     </Draggable>

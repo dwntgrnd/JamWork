@@ -59,6 +59,8 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-urgency-warning: var(--urgency-warning);
+  --color-urgency-overdue: var(--urgency-overdue);
 
   /* Avatar tokens */
   --color-avatar-1: var(--avatar-1);
@@ -198,6 +200,10 @@
   --info-foreground: oklch(0.98 0 0);
   --warning: oklch(0.82 0.16 80);
   --warning-foreground: oklch(0.20 0.05 80);
+
+  /* Due-date urgency text — darker on light for AA contrast (≥4.5:1) */
+  --urgency-warning: oklch(0.53 0.13 80);
+  --urgency-overdue: oklch(0.55 0.20 15);
 
   /* Header chrome — dark navy */
   --header: oklch(0.22 0.04 265);
@@ -349,6 +355,10 @@
   --info-foreground: oklch(0.95 0 0);
   --warning: oklch(0.82 0.16 80);
   --warning-foreground: oklch(0.20 0.05 80);
+
+  /* Due-date urgency text — bright on dark (already AA) */
+  --urgency-warning: oklch(0.82 0.16 80);
+  --urgency-overdue: oklch(0.65 0.22 15);
 
   /* Header chrome — darkest layer */
   --header: oklch(0.14 0.02 265);

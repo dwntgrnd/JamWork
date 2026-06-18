@@ -1,14 +1,15 @@
 
-import { Loader2, Check, AlertCircle } from 'lucide-react';
+import { Loader2, Check } from 'lucide-react';
 
 interface SaveStatusIndicatorProps {
   status: 'idle' | 'saving' | 'saved' | 'error';
-  error?: string | null;
+  /** Friendly name of the field being saved, e.g. "Status" — names the feedback. */
+  label?: string | null;
 }
 
-export function SaveStatusIndicator({ status, error }: SaveStatusIndicatorProps) {
-  // Render nothing when idle
-  if (status === 'idle') {
+export function SaveStatusIndicator({ status, label }: SaveStatusIndicatorProps) {
+  // Quiet progress pip only — failures are surfaced by the drawer's alert banner.
+  if (status !== 'saving' && status !== 'saved') {
     return null;
   }
 
@@ -17,26 +18,16 @@ export function SaveStatusIndicator({ status, error }: SaveStatusIndicatorProps)
       {status === 'saving' && (
         <>
           <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Saving...</span>
+          <span className="text-xs text-muted-foreground">
+            {label ? `Saving ${label.toLowerCase()}…` : 'Saving…'}
+          </span>
         </>
       )}
 
       {status === 'saved' && (
         <>
           <Check className="h-3.5 w-3.5 text-success" />
-          <span className="text-xs text-success">Saved</span>
-        </>
-      )}
-
-      {status === 'error' && (
-        <>
-          <AlertCircle className="h-3.5 w-3.5 text-destructive" />
-          <span
-            className="text-xs text-destructive max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap"
-            title={error || 'Error saving'}
-          >
-            {error || 'Error saving'}
-          </span>
+          <span className="text-xs text-success">{label ? `${label} saved` : 'Saved'}</span>
         </>
       )}
     </div>

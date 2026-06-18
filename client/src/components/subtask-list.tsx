@@ -29,7 +29,7 @@ export function SubtaskList({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[13px] text-muted-foreground">Subtasks</span>
+        <span className="text-xs font-medium text-muted-foreground">Subtasks</span>
         {subtasks.length > 0 && (
           <Badge variant="secondary" className="text-xs">
             {completedSubtasksCount}/{subtasks.length} complete
@@ -75,7 +75,7 @@ export function SubtaskList({
               onAdd();
             }
           }}
-          className="flex-1 h-8 text-sm border-none shadow-none focus-visible:ring-0 bg-transparent placeholder:text-muted-foreground/50"
+          className="flex-1 h-8 text-sm border-none shadow-none focus-visible:ring-0 bg-transparent placeholder:text-muted-foreground"
         />
       </div>
     </div>

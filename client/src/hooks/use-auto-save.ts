@@ -12,6 +12,8 @@ interface UseAutoSaveReturn {
   saveField: (fieldName: string, value: unknown) => Promise<void>;
   status: SaveStatus;
   error: string | null;
+  /** Field name of the most recent save — names the success/error feedback. */
+  field: string | null;
   clearError: () => void;
 }
 
@@ -20,6 +22,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
 
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [field, setField] = useState<string | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup timer on unmount
@@ -50,6 +53,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
       }
 
       // Set status to saving
+      setField(fieldName);
       setStatus("saving");
       setError(null);
 
@@ -80,6 +84,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     saveField,
     status,
     error,
+    field,
     clearError,
   };
 }

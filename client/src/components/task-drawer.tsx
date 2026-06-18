@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, type KeyboardEvent, type ReactNode } from 'react';
 import { apiGet, apiPost, apiPut, apiDelete, getErrorMessage } from '@/lib/api';
 import { invalidateProjects } from '@/hooks/use-projects';
 import {
@@ -19,7 +19,6 @@ import {
 import {
   Sheet,
   SheetContent,
-  SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
 import {
@@ -29,10 +28,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Check, Loader2, Trash2 } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Pencil, Trash2, X } from 'lucide-react';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { SaveStatusIndicator } from '@/components/save-status-indicator';
 import { AssigneeSelector } from '@/components/assignee-selector';
@@ -40,6 +38,58 @@ import { SubtaskList } from '@/components/subtask-list';
 import { TaskLinksSection } from '@/components/task-links-section';
 import { ProjectSelector } from '@/components/project-selector';
 import { DeleteConfirmDialog, UnsavedChangesDialog } from '@/components/task-drawer-dialogs';
+import { DueDatePicker } from '@/components/due-date-picker';
+import { getStatusChipClasses } from '@/lib/style-tokens';
+import { cn } from '@/lib/utils';
+
+/** Friendly labels for autosaved fields — used to name save feedback. */
+const FIELD_LABELS: Record<string, string> = {
+  title: 'Title',
+  description: 'Description',
+  status: 'Status',
+  priority: 'Priority',
+  effort: 'Effort',
+  sprintId: 'Sprint',
+  recurrence: 'Recurrence',
+  startDate: 'Start date',
+  dueDate: 'Due date',
+  assigneeIds: 'Assignees',
+  notifyEnabled: 'Notifications',
+};
+
+/** Chrome-free trigger styling shared by the property-row select controls. */
+const GHOST_TRIGGER =
+  'w-fit border-0 bg-transparent px-2 text-sm font-medium shadow-none hover:bg-muted/50';
+
+/**
+ * One property row: a fixed-width muted label column and a value column.
+ * `align="start"` top-anchors the label so it stays level with the first line
+ * when a value wraps (assignees, the notifications caption, the recurrence
+ * helper). `labelId` is the id the value control points at via aria-labelledby.
+ */
+function PropertyRow({
+  labelId,
+  label,
+  align = 'center',
+  children,
+}: {
+  labelId: string;
+  label: ReactNode;
+  align?: 'center' | 'start';
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn('grid grid-cols-[7rem_1fr] gap-x-3', align === 'start' ? 'items-start' : 'items-center')}>
+      <span
+        id={labelId}
+        className={cn('text-xs font-medium text-muted-foreground', align === 'start' && 'pt-2')}
+      >
+        {label}
+      </span>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
 
 interface TaskDrawerProps {
   mode: 'create' | 'edit';
@@ -109,10 +159,11 @@ export function TaskDrawer({
   const [sprints, setSprints] = useState<Sprint[]>([]);
 
   // Auto-save hook (edit mode only)
-  const { saveField, status: saveStatus, error: saveError } = useAutoSave({
+  const { saveField, status: saveStatus, error: saveError, field: saveFieldKey, clearError } = useAutoSave({
     taskId: task?.id || '',
     enabled: mode === 'edit' && !!task,
   });
+  const saveFieldLabel = saveFieldKey ? FIELD_LABELS[saveFieldKey] ?? null : null;
 
   useEffect(() => {
     fetchProjects();
@@ -377,7 +428,7 @@ export function TaskDrawer({
   // Create mode batch save
   const handleSave = async () => {
     if (!title.trim()) {
-      setError('Title is required');
+      setError('Please add a title');
       return;
     }
 
@@ -387,7 +438,7 @@ export function TaskDrawer({
     }
 
     if (!projectId) {
-      setError('Project is required');
+      setError('Please choose a project');
       return;
     }
 
@@ -424,6 +475,14 @@ export function TaskDrawer({
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to save task'));
       setSaving(false);
+    }
+  };
+
+  // Create mode: ⌘/Ctrl+Enter submits from any field (power-user accelerator).
+  const handleCreateKeyDown = (e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleSave();
     }
   };
 
@@ -522,18 +581,44 @@ export function TaskDrawer({
           side="right"
           className="w-full sm:w-[620px] sm:max-w-[620px] max-sm:!w-full max-sm:!max-w-full p-0 flex flex-col h-full"
         >
-          <SheetHeader className="sticky top-0 z-10 bg-background border-b px-6 py-4">
-            <SheetTitle>
-              {mode === 'create' ? 'Create New Task' : 'Edit Task'}
-            </SheetTitle>
-          </SheetHeader>
+          <SheetTitle className="sr-only">
+            {mode === 'create' ? 'New task' : 'Edit task'}
+          </SheetTitle>
 
-          <div className="flex-1 overflow-y-auto px-6 py-5">
+          {/* Autosave failure — loud, named, and states the revert plainly. pr-12 keeps it clear of the Sheet's floating close button. */}
+          {mode === 'edit' && saveStatus === 'error' && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 border-b border-destructive/20 bg-destructive/10 py-2.5 pl-6 pr-12 text-sm text-destructive"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p className="flex-1">
+                Couldn&apos;t save {saveFieldLabel ?? 'your change'}
+                {saveError ? `: ${saveError}` : ''}. The previous value was restored.
+              </p>
+              <button
+                type="button"
+                onClick={clearError}
+                aria-label="Dismiss"
+                className="-mr-1 shrink-0 rounded p-0.5 outline-none transition-colors hover:bg-destructive/10 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          <div
+            className={cn(
+              'flex-1 overflow-y-auto px-6 pb-5',
+              // Clear the Sheet's floating close button when no banner sits above the content.
+              mode === 'edit' && saveStatus === 'error' ? 'pt-4' : 'pt-10',
+            )}
+            onKeyDown={mode === 'create' ? handleCreateKeyDown : undefined}
+          >
             <div className="space-y-5">
-              {/* === IDENTITY GROUP === */}
-              <div className="space-y-2">
-                {/* Editable title heading */}
-                <div className="bg-field-bg rounded-lg border border-field-border hover:bg-field-bg/80 transition-colors">
+              {/* === TITLE — unboxed; hover-tint, teal ring, and a pencil signal editability === */}
+              <div>
+                <div className="group -mx-2 flex items-center gap-1.5 rounded-md px-2 transition-colors cursor-text hover:bg-muted/40 focus-within:bg-transparent focus-within:ring-[3px] focus-within:ring-ring/50">
                   <input
                     type="text"
                     value={title}
@@ -543,13 +628,230 @@ export function TaskDrawer({
                     maxLength={200}
                     autoFocus
                     aria-label="Task title"
-                    className="w-full text-xl font-semibold text-foreground bg-transparent border-0 outline-none ring-0 px-3 py-2.5 placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-ring/20 focus:rounded-lg transition-all"
+                    className="min-w-0 flex-1 border-0 bg-transparent py-1 text-2xl font-semibold text-foreground outline-none placeholder:text-muted-foreground"
                   />
+                  <Pencil aria-hidden="true" className="pointer-events-none h-4 w-4 shrink-0 text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100" />
                 </div>
+                {title.length > 160 && (
+                  <p className="mt-1 text-right text-xs text-muted-foreground">{title.length}/200</p>
+                )}
+              </div>
 
-                {/* Always-visible auto-growing description */}
-                <div className="bg-field-bg rounded-lg border border-field-border hover:bg-field-bg/80 transition-colors">
+              {/* === PROPERTIES — one grammar: muted label column + value column === */}
+              <div className="space-y-1">
+                {/* Status */}
+                <PropertyRow labelId="task-status-label" label="Status">
+                  <Select
+                    value={status}
+                    onValueChange={(v) => handleStatusChange(v as TaskStatus)}
+                  >
+                    <SelectTrigger
+                      aria-labelledby="task-status-label"
+                      className={cn('w-fit border-0 shadow-none', getStatusChipClasses(status))}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todo">{STATUS_LABELS.todo}</SelectItem>
+                      <SelectItem value="in_progress">{STATUS_LABELS.in_progress}</SelectItem>
+                      <SelectItem value="blocked">{STATUS_LABELS.blocked}</SelectItem>
+                      <SelectItem value="review">{STATUS_LABELS.review}</SelectItem>
+                      <SelectItem value="done">{STATUS_LABELS.done}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </PropertyRow>
+
+                {/* Due */}
+                <PropertyRow labelId="task-due-label" label="Due">
+                  <DueDatePicker
+                    value={dueDate}
+                    status={status}
+                    labelledById="task-due-label"
+                    onChange={handleDueDateChange}
+                    emptyLabel="No due date"
+                    showInlineClear
+                    withIcon
+                    triggerClassName="inline-flex h-9 items-center gap-1.5 px-2"
+                    labelClassName="text-sm font-medium"
+                  />
+                </PropertyRow>
+
+                {/* Priority */}
+                <PropertyRow labelId="task-priority-label" label="Priority">
+                  <Select
+                    value={priority}
+                    onValueChange={(v) => handlePriorityChange(v as TaskPriority)}
+                  >
+                    <SelectTrigger aria-labelledby="task-priority-label" className={GHOST_TRIGGER}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">{PRIORITY_LABELS.low}</SelectItem>
+                      <SelectItem value="medium">{PRIORITY_LABELS.medium}</SelectItem>
+                      <SelectItem value="high">{PRIORITY_LABELS.high}</SelectItem>
+                      <SelectItem value="urgent">{PRIORITY_LABELS.urgent}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </PropertyRow>
+
+                {/* Effort */}
+                <PropertyRow labelId="task-effort-label" label="Effort">
+                  <Select
+                    value={effort?.toString() || 'none'}
+                    onValueChange={(v) => handleEffortChange(v === 'none' ? null : parseInt(v) as TaskEffort)}
+                  >
+                    <SelectTrigger aria-labelledby="task-effort-label" className={GHOST_TRIGGER}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="1">S - Small</SelectItem>
+                      <SelectItem value="2">M - Medium</SelectItem>
+                      <SelectItem value="4">L - Large</SelectItem>
+                      <SelectItem value="8">XL - Extra Large</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </PropertyRow>
+
+                <div className="my-2 h-px bg-border" aria-hidden="true" />
+
+                {/* Sprint */}
+                <PropertyRow labelId="task-sprint-label" label="Sprint">
+                  <Select
+                    value={sprintId || 'none'}
+                    onValueChange={handleSprintChange}
+                  >
+                    <SelectTrigger aria-labelledby="task-sprint-label" className={GHOST_TRIGGER}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="backlog">Backlog</SelectItem>
+                      {filteredSprints.map((sprint) => (
+                        <SelectItem key={sprint.id} value={sprint.id}>
+                          <span className={sprint.status === 'active' ? 'font-semibold text-primary' : ''}>
+                            {sprint.name}
+                            {sprint.status === 'active' && ' (Active)'}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </PropertyRow>
+
+                {/* Start */}
+                <PropertyRow labelId="task-start-label" label="Start">
+                  <DueDatePicker
+                    value={startDate}
+                    plain
+                    labelledById="task-start-label"
+                    onChange={handleStartDateChange}
+                    emptyLabel="No start date"
+                    showInlineClear
+                    withIcon
+                    triggerClassName="inline-flex h-9 items-center gap-1.5 px-2"
+                    labelClassName="text-sm font-medium"
+                  />
+                </PropertyRow>
+
+                {/* Recurrence */}
+                <PropertyRow labelId="task-recurrence-label" label="Recurrence" align="start">
+                  <div>
+                    <Select
+                      value={recurrence || 'none'}
+                      onValueChange={(v) => handleRecurrenceChange(v === 'none' ? null : v as RecurrenceType)}
+                    >
+                      <SelectTrigger aria-labelledby="task-recurrence-label" className={GHOST_TRIGGER}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="biweekly">Biweekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {recurrence && (
+                      <p className="px-2 text-xs text-muted-foreground">
+                        Repeats {recurrence} after completion
+                      </p>
+                    )}
+                  </div>
+                </PropertyRow>
+
+                {/* Project */}
+                {(mode === 'edit' || (mode === 'create' && !initialProjectId)) && (
+                  <PropertyRow
+                    labelId="task-project-label"
+                    align="start"
+                    label={
+                      <>
+                        Project
+                        {mode === 'create' && !initialProjectId && <span className="text-destructive"> *</span>}
+                      </>
+                    }
+                  >
+                    <ProjectSelector
+                      projectId={projectId}
+                      projects={projects}
+                      onValueChange={(v) => {
+                        if (v === '__new__') {
+                          setShowNewProjectForm(true);
+                        } else {
+                          handleProjectChange(v);
+                        }
+                      }}
+                      showNewProjectForm={showNewProjectForm}
+                      newProjectName={newProjectName}
+                      onNewProjectNameChange={setNewProjectName}
+                      creatingProject={creatingProject}
+                      onCreateProject={handleCreateProject}
+                      onCancelNewProject={() => {
+                        setShowNewProjectForm(false);
+                        setNewProjectName('');
+                      }}
+                    />
+                  </PropertyRow>
+                )}
+
+                <div className="my-2 h-px bg-border" aria-hidden="true" />
+
+                {/* Assignees */}
+                <PropertyRow labelId="task-assignees-label" label="Assignees" align="start">
+                  <div className="py-1.5">
+                    <AssigneeSelector
+                      users={users}
+                      selectedAssignees={selectedAssignees}
+                      onToggle={handleToggleAssignee}
+                      labelledById="task-assignees-label"
+                    />
+                  </div>
+                </PropertyRow>
+
+                {/* Notifications */}
+                <PropertyRow labelId="task-notify-label" label="Notifications" align="start">
+                  <div className="space-y-1 py-1.5">
+                    <Switch
+                      aria-labelledby="task-notify-label"
+                      checked={notifyEnabled}
+                      onCheckedChange={handleNotifyEnabledChange}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      When off, no assignment, removal, or update emails are sent for this task.
+                    </p>
+                  </div>
+                </PropertyRow>
+              </div>
+
+              {/* === DESCRIPTION — below the properties, unboxed === */}
+              <div>
+                <label htmlFor="task-description" className="text-xs font-medium text-muted-foreground">
+                  Description
+                </label>
+                <div className="group mt-1 -mx-2 flex items-start gap-1.5 rounded-md px-2 transition-colors cursor-text hover:bg-muted/40 focus-within:bg-transparent focus-within:ring-[3px] focus-within:ring-ring/50">
                   <textarea
+                    id="task-description"
                     value={description}
                     onChange={(e) => {
                       setDescription(e.target.value);
@@ -560,8 +862,7 @@ export function TaskDrawer({
                     onBlur={mode === 'edit' ? handleDescriptionBlur : undefined}
                     placeholder="What needs to be done?"
                     maxLength={5000}
-                    aria-label="Task description"
-                    className="w-full min-h-[80px] text-sm text-foreground bg-transparent border-0 outline-none ring-0 px-3 py-2.5 resize-none placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-ring/20 focus:rounded-lg transition-all"
+                    className="min-w-0 flex-1 min-h-[72px] resize-none border-0 bg-transparent py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
                     ref={(el) => {
                       // Set initial height on mount based on content
                       if (el) {
@@ -570,213 +871,23 @@ export function TaskDrawer({
                       }
                     }}
                   />
+                  <Pencil aria-hidden="true" className="pointer-events-none mt-2 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100" />
                 </div>
               </div>
 
-              {/* === WORKFLOW GROUP — 2-column grid === */}
-              <div>
-                <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Workflow</h3>
-                <div className="grid grid-cols-2 gap-2.5">
-                    {/* Status */}
-                    <div className="bg-field-bg rounded-md border border-field-border p-2">
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Status</span>
-                      <Select
-                        value={status}
-                        onValueChange={(v) => handleStatusChange(v as TaskStatus)}
-                      >
-                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todo">{STATUS_LABELS.todo}</SelectItem>
-                          <SelectItem value="in_progress">{STATUS_LABELS.in_progress}</SelectItem>
-                          <SelectItem value="blocked">{STATUS_LABELS.blocked}</SelectItem>
-                          <SelectItem value="review">{STATUS_LABELS.review}</SelectItem>
-                          <SelectItem value="done">{STATUS_LABELS.done}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Priority */}
-                    <div className="bg-field-bg rounded-md border border-field-border p-2">
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Priority</span>
-                      <Select
-                        value={priority}
-                        onValueChange={(v) => handlePriorityChange(v as TaskPriority)}
-                      >
-                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">{PRIORITY_LABELS.low}</SelectItem>
-                          <SelectItem value="medium">{PRIORITY_LABELS.medium}</SelectItem>
-                          <SelectItem value="high">{PRIORITY_LABELS.high}</SelectItem>
-                          <SelectItem value="urgent">{PRIORITY_LABELS.urgent}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Effort */}
-                    <div className="bg-field-bg rounded-md border border-field-border p-2">
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Effort</span>
-                      <Select
-                        value={effort?.toString() || 'none'}
-                        onValueChange={(v) => handleEffortChange(v === 'none' ? null : parseInt(v) as TaskEffort)}
-                      >
-                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="1">S - Small</SelectItem>
-                          <SelectItem value="2">M - Medium</SelectItem>
-                          <SelectItem value="4">L - Large</SelectItem>
-                          <SelectItem value="8">XL - Extra Large</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Sprint */}
-                    <div className="bg-field-bg rounded-md border border-field-border p-2">
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Sprint</span>
-                      <Select
-                        value={sprintId || 'none'}
-                        onValueChange={handleSprintChange}
-                      >
-                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="backlog">Backlog</SelectItem>
-                          {filteredSprints.map((sprint) => (
-                            <SelectItem key={sprint.id} value={sprint.id}>
-                              <span className={sprint.status === 'active' ? 'font-semibold text-primary' : ''}>
-                                {sprint.name}
-                                {sprint.status === 'active' && ' (Active)'}
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Start Date */}
-                    <div className="bg-field-bg rounded-md border border-field-border p-2">
-                      <label htmlFor="start-date" className="text-[11px] text-muted-foreground uppercase tracking-wider">Start</label>
-                      <Input
-                        id="start-date"
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => handleStartDateChange(e.target.value)}
-                        className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5"
-                      />
-                    </div>
-
-                    {/* Due Date */}
-                    <div className="bg-field-bg rounded-md border border-field-border p-2">
-                      <label htmlFor="due-date" className="text-[11px] text-muted-foreground uppercase tracking-wider">Due</label>
-                      <Input
-                        id="due-date"
-                        type="date"
-                        value={dueDate}
-                        onChange={(e) => handleDueDateChange(e.target.value)}
-                        className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5"
-                      />
-                    </div>
-
-                    {/* Recurrence */}
-                    <div className="bg-field-bg rounded-md border border-field-border p-2">
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Recurrence</span>
-                      <Select
-                        value={recurrence || 'none'}
-                        onValueChange={(v) => handleRecurrenceChange(v === 'none' ? null : v as RecurrenceType)}
-                      >
-                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="biweekly">Biweekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {recurrence && (
-                        <p className="text-[11px] text-muted-foreground/70 mt-0.5">
-                          Repeats {recurrence} after completion
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Project */}
-                    {(mode === 'edit' || (mode === 'create' && !initialProjectId)) && (
-                      <ProjectSelector
-                        projectId={projectId}
-                        projects={projects}
-                        required={mode === 'create' && !initialProjectId}
-                        onValueChange={(v) => {
-                          if (v === '__new__') {
-                            setShowNewProjectForm(true);
-                          } else {
-                            handleProjectChange(v);
-                          }
-                        }}
-                        showNewProjectForm={showNewProjectForm}
-                        newProjectName={newProjectName}
-                        onNewProjectNameChange={setNewProjectName}
-                        creatingProject={creatingProject}
-                        onCreateProject={handleCreateProject}
-                        onCancelNewProject={() => {
-                          setShowNewProjectForm(false);
-                          setNewProjectName('');
-                        }}
-                      />
-                    )}
-                </div>
-              </div>
-
-              {/* === NOTIFICATIONS — task-wide flag === */}
-              <div className="flex items-start justify-between gap-4 rounded-md border border-field-border bg-field-bg p-3">
-                <div className="space-y-0.5">
-                  <label htmlFor="task-notify-enabled" className="text-sm font-medium text-foreground">
-                    Email notifications for this task
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    When off, no assignment, removal, or update emails are sent for this task.
-                  </p>
-                </div>
-                <Switch
-                  id="task-notify-enabled"
-                  checked={notifyEnabled}
-                  onCheckedChange={handleNotifyEnabledChange}
+              {/* === SUBTASKS (edit mode only) === */}
+              {mode === 'edit' && task && (
+                <SubtaskList
+                  subtasks={subtasks}
+                  newSubtaskTitle={newSubtaskTitle}
+                  onNewSubtaskTitleChange={setNewSubtaskTitle}
+                  onAdd={handleAddSubtask}
+                  onToggle={handleToggleSubtask}
+                  onDelete={handleDeleteSubtask}
                 />
-              </div>
+              )}
 
-              {/* === ASSIGNEES — own section === */}
-              <AssigneeSelector
-                users={users}
-                selectedAssignees={selectedAssignees}
-                onToggle={handleToggleAssignee}
-              />
-
-              {/* === SUBTASKS & LINKS === */}
-              <div className="space-y-3">
-                {/* Subtasks (edit mode only) */}
-                {mode === 'edit' && task && (
-                  <SubtaskList
-                    subtasks={subtasks}
-                    newSubtaskTitle={newSubtaskTitle}
-                    onNewSubtaskTitleChange={setNewSubtaskTitle}
-                    onAdd={handleAddSubtask}
-                    onToggle={handleToggleSubtask}
-                    onDelete={handleDeleteSubtask}
-                  />
-                )}
-              </div>
-
-              {/* === RELATED ITEMS GROUP === */}
+              {/* === LINKS (edit mode only) === */}
               {mode === 'edit' && task && (
                 <TaskLinksSection
                   links={links}
@@ -810,7 +921,7 @@ export function TaskDrawer({
               {mode === 'create' && saved && (
                 <p className="text-sm text-success bg-success/10 p-2 rounded flex items-center gap-2">
                   <Check className="h-4 w-4" />
-                  Saved successfully!
+                  Task created.
                 </p>
               )}
             </div>
@@ -827,15 +938,15 @@ export function TaskDrawer({
                   {saving ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Saving...
+                      Creating…
                     </>
                   ) : saved ? (
                     <>
                       <Check className="h-4 w-4 mr-2" />
-                      Saved
+                      Created
                     </>
                   ) : (
-                    'Save'
+                    'Create task'
                   )}
                 </Button>
               </div>
@@ -845,7 +956,7 @@ export function TaskDrawer({
           {/* Footer - edit mode */}
           {mode === 'edit' && task && (
             <div className="sticky bottom-0 bg-background border-t px-6 py-3">
-              <div className="flex justify-between items-center">
+              <div className="flex items-center justify-between">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -853,9 +964,9 @@ export function TaskDrawer({
                   onClick={() => setShowDeleteDialog(true)}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Task
+                  Delete task
                 </Button>
-                <SaveStatusIndicator status={saveStatus} error={saveError} />
+                <SaveStatusIndicator status={saveStatus} label={saveFieldLabel} />
               </div>
             </div>
           )}

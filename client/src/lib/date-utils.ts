@@ -103,8 +103,39 @@ export function isTomorrow(dateStr?: string | Date): boolean {
 }
 
 /**
+ * Whole days from today (local midnight) to the given date (local midnight).
+ * Negative for past dates. Uses the timezone-safe local-day anchor.
+ */
+function daysUntil(dateStr: string | Date): number {
+  const target = startOfLocalDay(dateStr).getTime();
+  const today = startOfLocalDay().getTime();
+  return Math.round((target - today) / 86_400_000);
+}
+
+/**
+ * Checks if a date is 2–6 days from today (inclusive) — the "this week" tier.
+ * @param dateStr - Date string or Date object
+ * @returns true if the date is 2–6 days out
+ */
+export function isThisWeek(dateStr: string | Date): boolean {
+  const d = daysUntil(dateStr);
+  return d >= 2 && d <= 6;
+}
+
+/**
+ * Checks if a date is 7–14 days from today (inclusive) — the "soon" tier.
+ * @param dateStr - Date string or Date object
+ * @returns true if the date is 7–14 days out
+ */
+export function isSoon(dateStr: string | Date): boolean {
+  const d = daysUntil(dateStr);
+  return d >= 7 && d <= 14;
+}
+
+/**
  * Returns date urgency information with label, styling, and urgency flag.
- * Supports overdue, today, tomorrow, future, and no-date cases.
+ * Graduated tiers: no-date, done, overdue, today, tomorrow, this-week (day
+ * name), soon (foreground date), and distant (muted date).
  * @param dateStr - Date string or Date object
  * @param taskStatus - Task status (optional)
  * @returns Object with label (display text), className (Tailwind classes), and isUrgent flag
@@ -136,7 +167,7 @@ export function getDateUrgencyInfo(dateStr?: string | Date, taskStatus?: string)
   if (isOverdue(dateStr, taskStatus)) {
     return {
       label: `Overdue · ${formatDate(dateStr)}`,
-      className: 'text-destructive font-semibold',
+      className: 'text-urgency-overdue font-semibold',
       isUrgent: true,
     };
   }
@@ -145,7 +176,7 @@ export function getDateUrgencyInfo(dateStr?: string | Date, taskStatus?: string)
   if (isToday(dateStr)) {
     return {
       label: 'Today',
-      className: 'text-warning font-medium',
+      className: 'text-urgency-warning font-medium',
       isUrgent: true,
     };
   }
@@ -154,12 +185,30 @@ export function getDateUrgencyInfo(dateStr?: string | Date, taskStatus?: string)
   if (isTomorrow(dateStr)) {
     return {
       label: 'Tomorrow',
-      className: 'text-warning font-medium',
+      className: 'text-urgency-warning font-medium',
       isUrgent: true,
     };
   }
 
-  // Future case (default)
+  // This week (2–6 days out) — weekday name in the user's locale
+  if (isThisWeek(dateStr)) {
+    return {
+      label: parseLocalDate(dateStr).toLocaleDateString(undefined, { weekday: 'long' }),
+      className: 'text-foreground font-medium',
+      isUrgent: false,
+    };
+  }
+
+  // Soon (7–14 days out) — formatted date kept visually present
+  if (isSoon(dateStr)) {
+    return {
+      label: formatDate(dateStr),
+      className: 'text-foreground',
+      isUrgent: false,
+    };
+  }
+
+  // Distant (15+ days out) — muted formatted date
   return {
     label: formatDate(dateStr),
     className: 'text-muted-foreground',
