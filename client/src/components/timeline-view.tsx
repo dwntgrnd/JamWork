@@ -60,8 +60,12 @@ const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewP
   const sprintsQuery = useSprints();
   const milestonesQuery = useMilestones();
 
-  // Only tasks with a start or due date land on the timeline.
-  const tasks = (tasksQuery.data ?? []).filter((t) => t.dueDate || t.startDate);
+  // Only tasks with a start or due date land on the timeline, and only when not
+  // explicitly hidden via the per-task visibility toggle (CC34). `!== false`
+  // keeps tasks whose flag is undefined (older data) or true.
+  const tasks = (tasksQuery.data ?? []).filter(
+    (t) => (t.dueDate || t.startDate) && t.showOnTimeline !== false
+  );
   const projects = projectsQuery.data ?? [];
   const sprints = sprintsQuery.data ?? [];
   const milestones = milestonesQuery.data ?? [];

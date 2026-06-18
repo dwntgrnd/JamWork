@@ -64,6 +64,8 @@ class TaskModel
             'sprintId' => $row['sprint_id'],
             'inSprintBacklog' => (bool) $row['in_sprint_backlog'],
             'notifyEnabled' => (bool) ($row['notify_enabled'] ?? 1),
+            'showOnTimeline' => (bool) ($row['show_on_timeline'] ?? 1),
+            'includeInReport' => (bool) ($row['include_in_report'] ?? 1),
             'projectId' => $row['project_id'],
             'createdById' => $row['created_by_id'],
             'createdAt' => date('c', strtotime($row['created_at'])),

@@ -156,6 +156,21 @@ final class ReportRoutesTest extends IntegrationTestCase
         $this->assertContains('Excluded', $names2);
     }
 
+    // --- Per-task report inclusion (CC34) ---------------------------------
+
+    public function testTaskExcludedFromReportWhenIncludeInReportIsZero(): void
+    {
+        $projectId = $this->seedProject($this->user['id'], ['name' => 'Apollo']);
+        $this->seedTask($projectId, $this->user['id'], ['title' => 'Shown', 'status' => 'todo']);
+        $this->seedTask($projectId, $this->user['id'], ['title' => 'Hidden', 'status' => 'todo', 'include_in_report' => 0]);
+
+        $res = $this->request('POST', '/reports', null, $this->token);
+        $titles = $this->payloadTaskTitles($this->decode($res)['report']['payload']);
+
+        $this->assertContains('Shown', $titles, 'include_in_report = 1 still appears');
+        $this->assertNotContains('Hidden', $titles, 'include_in_report = 0 is filtered out');
+    }
+
     // --- Soft delete ------------------------------------------------------
 
     public function testSoftDeletedTaskNeverAppears(): void

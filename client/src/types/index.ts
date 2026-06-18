@@ -163,6 +163,8 @@ export interface Task {
   sortOrder: number;
   recurrence?: RecurrenceType | null;
   notifyEnabled?: boolean;
+  showOnTimeline?: boolean;
+  includeInReport?: boolean;
   sprintId?: string | null;
   sprint?: {
     id: string;
