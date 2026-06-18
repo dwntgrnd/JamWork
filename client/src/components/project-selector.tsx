@@ -38,11 +38,11 @@ export function ProjectSelector({
 }: ProjectSelectorProps) {
   return (
     <div>
-      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">
+      <span id="task-project-label" className="text-xs font-medium text-muted-foreground">
         Project {required && <span className="text-destructive">*</span>}
       </span>
       <Select value={projectId} onValueChange={onValueChange}>
-        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
+        <SelectTrigger aria-labelledby="task-project-label" className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
           <SelectValue placeholder="Select project" />
         </SelectTrigger>
         <SelectContent>

@@ -1,5 +1,6 @@
+import { useId } from "react";
 import { X } from "lucide-react";
-import { getDateUrgencyInfo, parseLocalDate } from "@/lib/date-utils";
+import { formatDate, getDateUrgencyInfo, parseLocalDate } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import {
   Popover,
@@ -26,6 +27,12 @@ interface DueDatePickerProps {
   showInlineClear?: boolean;
   /** Popover alignment. */
   align?: "start" | "center" | "end";
+  /** Show a neutral formatted date with no due-date urgency coloring (e.g. a start date). */
+  plain?: boolean;
+  /** Extra classes for the root wrapper — e.g. "w-full" to fill a grid cell. */
+  containerClassName?: string;
+  /** Id of an external field label; names the trigger alongside its value for screen readers. */
+  labelledById?: string;
 }
 
 /** Coerces a value to the "YYYY-MM-DD" string a native date input expects. */
@@ -51,7 +58,11 @@ export function DueDatePicker({
   labelClassName,
   showInlineClear = false,
   align = "start",
+  plain = false,
+  containerClassName,
+  labelledById,
 }: DueDatePickerProps) {
+  const valueId = useId();
   // Normalize through parseLocalDate so date-only values anchor to the local
   // calendar day (no UTC-midnight drift); ISO datetimes pass through unchanged,
   // preserving existing list/board behavior.
@@ -59,23 +70,33 @@ export function DueDatePicker({
     value ? parseLocalDate(value) : undefined,
     status,
   );
-  const label = !value && emptyLabel ? emptyLabel : urgency.label;
+  // Due dates carry graduated urgency coloring; "plain" dates (e.g. a start
+  // date) show a neutral formatted date so a past start never reads as overdue.
+  const plainLabel = value ? formatDate(parseLocalDate(value)) : (emptyLabel ?? "—");
+  const label = plain
+    ? plainLabel
+    : !value && emptyLabel
+      ? emptyLabel
+      : urgency.label;
+  const setClassName = plain ? "text-foreground" : urgency.className;
 
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className={cn("inline-flex items-center gap-1", containerClassName)}>
       <Popover>
         <PopoverTrigger asChild>
           <button
             type="button"
+            aria-labelledby={labelledById ? `${labelledById} ${valueId}` : undefined}
             className={cn(
               "text-left rounded outline-none transition-colors hover:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring/50",
               triggerClassName,
             )}
           >
             <span
+              id={valueId}
               className={cn(
                 "whitespace-nowrap",
-                value ? urgency.className : "text-muted-foreground",
+                value ? setClassName : "text-muted-foreground",
                 labelClassName,
               )}
             >
@@ -107,7 +128,7 @@ export function DueDatePicker({
       {showInlineClear && value && (
         <button
           type="button"
-          aria-label="Clear due date"
+          aria-label="Clear date"
           className="-mr-1 inline-flex size-7 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
           onClick={() => onChange("")}
         >

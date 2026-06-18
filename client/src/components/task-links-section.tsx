@@ -42,7 +42,7 @@ export function TaskLinksSection({
   return (
     <div className="space-y-3 pt-2">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Links</span>
+        <span className="text-xs font-medium text-muted-foreground">Links</span>
         <Button
           variant="ghost"
           size="sm"
@@ -131,7 +131,7 @@ export function TaskLinksSection({
           onClick={() => onShowAddLinkChange(true)}
         >
           <LinkIcon className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-          <span className="text-sm text-muted-foreground/50">Add a link...</span>
+          <span className="text-sm text-muted-foreground">Add a link...</span>
         </div>
       )}
     </div>

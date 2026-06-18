@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, type KeyboardEvent } from 'react';
 import { apiGet, apiPost, apiPut, apiDelete, getErrorMessage } from '@/lib/api';
 import { invalidateProjects } from '@/hooks/use-projects';
 import {
@@ -29,10 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Check, Loader2, Trash2 } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Trash2, X } from 'lucide-react';
 import { useAutoSave } from '@/hooks/use-auto-save';
 import { SaveStatusIndicator } from '@/components/save-status-indicator';
 import { AssigneeSelector } from '@/components/assignee-selector';
@@ -43,6 +42,21 @@ import { DeleteConfirmDialog, UnsavedChangesDialog } from '@/components/task-dra
 import { DueDatePicker } from '@/components/due-date-picker';
 import { getStatusChipClasses } from '@/lib/style-tokens';
 import { cn } from '@/lib/utils';
+
+/** Friendly labels for autosaved fields — used to name save feedback. */
+const FIELD_LABELS: Record<string, string> = {
+  title: 'Title',
+  description: 'Description',
+  status: 'Status',
+  priority: 'Priority',
+  effort: 'Effort',
+  sprintId: 'Sprint',
+  recurrence: 'Recurrence',
+  startDate: 'Start date',
+  dueDate: 'Due date',
+  assigneeIds: 'Assignees',
+  notifyEnabled: 'Notifications',
+};
 
 interface TaskDrawerProps {
   mode: 'create' | 'edit';
@@ -112,10 +126,11 @@ export function TaskDrawer({
   const [sprints, setSprints] = useState<Sprint[]>([]);
 
   // Auto-save hook (edit mode only)
-  const { saveField, status: saveStatus, error: saveError } = useAutoSave({
+  const { saveField, status: saveStatus, error: saveError, field: saveFieldKey, clearError } = useAutoSave({
     taskId: task?.id || '',
     enabled: mode === 'edit' && !!task,
   });
+  const saveFieldLabel = saveFieldKey ? FIELD_LABELS[saveFieldKey] ?? null : null;
 
   useEffect(() => {
     fetchProjects();
@@ -380,7 +395,7 @@ export function TaskDrawer({
   // Create mode batch save
   const handleSave = async () => {
     if (!title.trim()) {
-      setError('Title is required');
+      setError('Please add a title');
       return;
     }
 
@@ -390,7 +405,7 @@ export function TaskDrawer({
     }
 
     if (!projectId) {
-      setError('Project is required');
+      setError('Please choose a project');
       return;
     }
 
@@ -427,6 +442,14 @@ export function TaskDrawer({
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to save task'));
       setSaving(false);
+    }
+  };
+
+  // Create mode: ⌘/Ctrl+Enter submits from any field (power-user accelerator).
+  const handleCreateKeyDown = (e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleSave();
     }
   };
 
@@ -531,7 +554,32 @@ export function TaskDrawer({
             </SheetTitle>
           </SheetHeader>
 
-          <div className="flex-1 overflow-y-auto px-6 py-5">
+          {/* Autosave failure — loud, named, and states the revert plainly */}
+          {mode === 'edit' && saveStatus === 'error' && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 border-b border-destructive/20 bg-destructive/10 px-6 py-2.5 text-sm text-destructive"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p className="flex-1">
+                Couldn&apos;t save {saveFieldLabel ?? 'your change'}
+                {saveError ? `: ${saveError}` : ''}. The previous value was restored.
+              </p>
+              <button
+                type="button"
+                onClick={clearError}
+                aria-label="Dismiss"
+                className="-mr-1 shrink-0 rounded p-0.5 outline-none transition-colors hover:bg-destructive/10 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          <div
+            className="flex-1 overflow-y-auto px-6 py-5"
+            onKeyDown={mode === 'create' ? handleCreateKeyDown : undefined}
+          >
             <div className="space-y-5">
               {/* === IDENTITY GROUP === */}
               <div className="space-y-2">
@@ -546,9 +594,13 @@ export function TaskDrawer({
                     maxLength={200}
                     autoFocus
                     aria-label="Task title"
-                    className="w-full text-xl font-semibold text-foreground bg-transparent border-0 outline-none ring-0 px-3 py-2.5 placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-ring/20 focus:rounded-lg transition-all"
+                    className="w-full text-xl font-semibold text-foreground bg-transparent border-0 outline-none ring-0 px-3 py-2.5 placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/20 focus:rounded-lg transition-all"
                   />
                 </div>
+
+                {title.length > 160 && (
+                  <p className="text-right text-xs text-muted-foreground">{title.length}/200</p>
+                )}
 
                 {/* Always-visible auto-growing description */}
                 <div className="bg-field-bg rounded-lg border border-field-border hover:bg-field-bg/80 transition-colors">
@@ -564,7 +616,7 @@ export function TaskDrawer({
                     placeholder="What needs to be done?"
                     maxLength={5000}
                     aria-label="Task description"
-                    className="w-full min-h-[80px] text-sm text-foreground bg-transparent border-0 outline-none ring-0 px-3 py-2.5 resize-none placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-ring/20 focus:rounded-lg transition-all"
+                    className="w-full min-h-[80px] text-sm text-foreground bg-transparent border-0 outline-none ring-0 px-3 py-2.5 resize-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/20 focus:rounded-lg transition-all"
                     ref={(el) => {
                       // Set initial height on mount based on content
                       if (el) {
@@ -580,12 +632,12 @@ export function TaskDrawer({
               <div className="space-y-2">
                 {/* Status hero */}
                 <div className="flex items-center justify-between gap-3 min-h-9">
-                  <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Status</span>
+                  <span id="task-status-label" className="text-xs font-medium text-muted-foreground">Status</span>
                   <Select
                     value={status}
                     onValueChange={(v) => handleStatusChange(v as TaskStatus)}
                   >
-                    <SelectTrigger className={cn("h-9 w-40 border-0 shadow-none", getStatusChipClasses(status))}>
+                    <SelectTrigger aria-labelledby="task-status-label" className={cn("h-9 w-40 border-0 shadow-none", getStatusChipClasses(status))}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -600,10 +652,11 @@ export function TaskDrawer({
 
                 {/* Due Date hero */}
                 <div className="flex items-center justify-between gap-3 min-h-9">
-                  <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Due</span>
+                  <span id="task-due-label" className="text-xs font-medium text-muted-foreground">Due</span>
                   <DueDatePicker
                     value={dueDate}
                     status={status}
+                    labelledById="task-due-label"
                     onChange={handleDueDateChange}
                     emptyLabel="No due date"
                     showInlineClear
@@ -620,12 +673,12 @@ export function TaskDrawer({
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     {/* Priority */}
                     <div>
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Priority</span>
+                      <span id="task-priority-label" className="text-xs font-medium text-muted-foreground">Priority</span>
                       <Select
                         value={priority}
                         onValueChange={(v) => handlePriorityChange(v as TaskPriority)}
                       >
-                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
+                        <SelectTrigger aria-labelledby="task-priority-label" className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -639,12 +692,12 @@ export function TaskDrawer({
 
                     {/* Effort */}
                     <div>
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Effort</span>
+                      <span id="task-effort-label" className="text-xs font-medium text-muted-foreground">Effort</span>
                       <Select
                         value={effort?.toString() || 'none'}
                         onValueChange={(v) => handleEffortChange(v === 'none' ? null : parseInt(v) as TaskEffort)}
                       >
-                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
+                        <SelectTrigger aria-labelledby="task-effort-label" className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -659,12 +712,12 @@ export function TaskDrawer({
 
                     {/* Sprint */}
                     <div>
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Sprint</span>
+                      <span id="task-sprint-label" className="text-xs font-medium text-muted-foreground">Sprint</span>
                       <Select
                         value={sprintId || 'none'}
                         onValueChange={handleSprintChange}
                       >
-                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
+                        <SelectTrigger aria-labelledby="task-sprint-label" className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -684,12 +737,12 @@ export function TaskDrawer({
 
                     {/* Recurrence */}
                     <div>
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Recurrence</span>
+                      <span id="task-recurrence-label" className="text-xs font-medium text-muted-foreground">Recurrence</span>
                       <Select
                         value={recurrence || 'none'}
                         onValueChange={(v) => handleRecurrenceChange(v === 'none' ? null : v as RecurrenceType)}
                       >
-                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
+                        <SelectTrigger aria-labelledby="task-recurrence-label" className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -701,21 +754,25 @@ export function TaskDrawer({
                         </SelectContent>
                       </Select>
                       {recurrence && (
-                        <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           Repeats {recurrence} after completion
                         </p>
                       )}
                     </div>
 
-                    {/* Start Date */}
+                    {/* Start Date — same date picker as Due, minus urgency coloring */}
                     <div>
-                      <label htmlFor="start-date" className="text-[11px] text-muted-foreground uppercase tracking-wider">Start</label>
-                      <Input
-                        id="start-date"
-                        type="date"
+                      <span id="task-start-label" className="text-xs font-medium text-muted-foreground">Start</span>
+                      <DueDatePicker
                         value={startDate}
-                        onChange={(e) => handleStartDateChange(e.target.value)}
-                        className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5"
+                        plain
+                        labelledById="task-start-label"
+                        onChange={handleStartDateChange}
+                        emptyLabel="No start date"
+                        showInlineClear
+                        containerClassName="w-full mt-0.5"
+                        triggerClassName="h-8 flex-1 px-2"
+                        labelClassName="text-sm font-medium"
                       />
                     </div>
 
@@ -819,7 +876,7 @@ export function TaskDrawer({
               {mode === 'create' && saved && (
                 <p className="text-sm text-success bg-success/10 p-2 rounded flex items-center gap-2">
                   <Check className="h-4 w-4" />
-                  Saved successfully!
+                  Task created.
                 </p>
               )}
             </div>
@@ -836,15 +893,15 @@ export function TaskDrawer({
                   {saving ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Saving...
+                      Creating…
                     </>
                   ) : saved ? (
                     <>
                       <Check className="h-4 w-4 mr-2" />
-                      Saved
+                      Created
                     </>
                   ) : (
-                    'Save'
+                    'Create task'
                   )}
                 </Button>
               </div>
@@ -864,7 +921,7 @@ export function TaskDrawer({
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete Task
                 </Button>
-                <SaveStatusIndicator status={saveStatus} error={saveError} />
+                <SaveStatusIndicator status={saveStatus} label={saveFieldLabel} />
               </div>
             </div>
           )}
