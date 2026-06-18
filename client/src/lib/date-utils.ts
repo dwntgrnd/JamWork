@@ -167,7 +167,7 @@ export function getDateUrgencyInfo(dateStr?: string | Date, taskStatus?: string)
   if (isOverdue(dateStr, taskStatus)) {
     return {
       label: `Overdue · ${formatDate(dateStr)}`,
-      className: 'text-destructive font-semibold',
+      className: 'text-urgency-overdue font-semibold',
       isUrgent: true,
     };
   }
@@ -176,7 +176,7 @@ export function getDateUrgencyInfo(dateStr?: string | Date, taskStatus?: string)
   if (isToday(dateStr)) {
     return {
       label: 'Today',
-      className: 'text-warning font-medium',
+      className: 'text-urgency-warning font-medium',
       isUrgent: true,
     };
   }
@@ -185,7 +185,7 @@ export function getDateUrgencyInfo(dateStr?: string | Date, taskStatus?: string)
   if (isTomorrow(dateStr)) {
     return {
       label: 'Tomorrow',
-      className: 'text-warning font-medium',
+      className: 'text-urgency-warning font-medium',
       isUrgent: true,
     };
   }

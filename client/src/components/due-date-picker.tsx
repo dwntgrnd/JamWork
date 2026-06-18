@@ -68,7 +68,7 @@ export function DueDatePicker({
           <button
             type="button"
             className={cn(
-              "text-left rounded hover:bg-muted/50 transition-colors",
+              "text-left rounded outline-none transition-colors hover:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring/50",
               triggerClassName,
             )}
           >
@@ -108,7 +108,7 @@ export function DueDatePicker({
         <button
           type="button"
           aria-label="Clear due date"
-          className="text-muted-foreground hover:text-foreground transition-colors"
+          className="-mr-1 inline-flex size-7 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
           onClick={() => onChange("")}
         >
           <X className="h-3.5 w-3.5" />

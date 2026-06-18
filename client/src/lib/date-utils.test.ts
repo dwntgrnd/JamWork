@@ -49,21 +49,21 @@ describe('getDateUrgencyInfo — urgency tiers', () => {
     const past = daysFromToday(-2);
     const info = getDateUrgencyInfo(past, 'todo');
     expect(info.label).toBe(`Overdue · ${formatDate(past)}`);
-    expect(info.className).toBe('text-destructive font-semibold');
+    expect(info.className).toBe('text-urgency-overdue font-semibold');
     expect(info.isUrgent).toBe(true);
   });
 
   it('shows "Today" with warning styling (not a day name)', () => {
     const info = getDateUrgencyInfo(daysFromToday(0), 'todo');
     expect(info.label).toBe('Today');
-    expect(info.className).toBe('text-warning font-medium');
+    expect(info.className).toBe('text-urgency-warning font-medium');
     expect(info.isUrgent).toBe(true);
   });
 
   it('shows "Tomorrow" with warning styling (not a day name)', () => {
     const info = getDateUrgencyInfo(daysFromToday(1), 'todo');
     expect(info.label).toBe('Tomorrow');
-    expect(info.className).toBe('text-warning font-medium');
+    expect(info.className).toBe('text-urgency-warning font-medium');
     expect(info.isUrgent).toBe(true);
   });
 
