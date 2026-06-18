@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { X } from "lucide-react";
+import { Calendar, X } from "lucide-react";
 import { formatDate, getDateUrgencyInfo, parseLocalDate } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import {
@@ -33,6 +33,8 @@ interface DueDatePickerProps {
   containerClassName?: string;
   /** Id of an external field label; names the trigger alongside its value for screen readers. */
   labelledById?: string;
+  /** Show a leading calendar icon to signal the value is an editable date. */
+  withIcon?: boolean;
 }
 
 /** Coerces a value to the "YYYY-MM-DD" string a native date input expects. */
@@ -61,6 +63,7 @@ export function DueDatePicker({
   plain = false,
   containerClassName,
   labelledById,
+  withIcon = false,
 }: DueDatePickerProps) {
   const valueId = useId();
   // Normalize through parseLocalDate so date-only values anchor to the local
@@ -92,6 +95,9 @@ export function DueDatePicker({
               triggerClassName,
             )}
           >
+            {withIcon && (
+              <Calendar aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            )}
             <span
               id={valueId}
               className={cn(

@@ -13,7 +13,6 @@ import { Project } from '@/types';
 interface ProjectSelectorProps {
   projectId: string;
   projects: Project[];
-  required: boolean;
   onValueChange: (value: string) => void;
   showNewProjectForm: boolean;
   newProjectName: string;
@@ -23,11 +22,10 @@ interface ProjectSelectorProps {
   onCancelNewProject: () => void;
 }
 
-/** Project field with inline "New Project" creation (task drawer). */
+/** Project value control with inline "New Project" creation (label supplied by the row). */
 export function ProjectSelector({
   projectId,
   projects,
-  required,
   onValueChange,
   showNewProjectForm,
   newProjectName,
@@ -38,11 +36,8 @@ export function ProjectSelector({
 }: ProjectSelectorProps) {
   return (
     <div>
-      <span id="task-project-label" className="text-xs font-medium text-muted-foreground">
-        Project {required && <span className="text-destructive">*</span>}
-      </span>
       <Select value={projectId} onValueChange={onValueChange}>
-        <SelectTrigger aria-labelledby="task-project-label" className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
+        <SelectTrigger aria-labelledby="task-project-label" className="w-fit border-0 bg-transparent px-2 text-sm font-medium shadow-none hover:bg-muted/50">
           <SelectValue placeholder="Select project" />
         </SelectTrigger>
         <SelectContent>
