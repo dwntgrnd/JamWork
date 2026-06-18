@@ -37,7 +37,7 @@ export function ProjectSelector({
   onCancelNewProject,
 }: ProjectSelectorProps) {
   return (
-    <div className="bg-field-bg rounded-md border border-field-border p-2">
+    <div>
       <span className="text-[11px] text-muted-foreground uppercase tracking-wider">
         Project {required && <span className="text-destructive">*</span>}
       </span>
