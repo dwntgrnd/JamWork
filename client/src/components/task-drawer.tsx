@@ -40,6 +40,9 @@ import { SubtaskList } from '@/components/subtask-list';
 import { TaskLinksSection } from '@/components/task-links-section';
 import { ProjectSelector } from '@/components/project-selector';
 import { DeleteConfirmDialog, UnsavedChangesDialog } from '@/components/task-drawer-dialogs';
+import { DueDatePicker } from '@/components/due-date-picker';
+import { getStatusChipClasses } from '@/lib/style-tokens';
+import { cn } from '@/lib/utils';
 
 interface TaskDrawerProps {
   mode: 'create' | 'edit';
@@ -573,30 +576,48 @@ export function TaskDrawer({
                 </div>
               </div>
 
+              {/* === HERO FIELDS — Status & Due Date === */}
+              <div className="space-y-2">
+                {/* Status hero */}
+                <div className="flex items-center justify-between gap-3 bg-field-bg rounded-md border border-field-border px-3 py-2">
+                  <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Status</span>
+                  <Select
+                    value={status}
+                    onValueChange={(v) => handleStatusChange(v as TaskStatus)}
+                  >
+                    <SelectTrigger className={cn("h-9 w-40 border-0 shadow-none", getStatusChipClasses(status))}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todo">{STATUS_LABELS.todo}</SelectItem>
+                      <SelectItem value="in_progress">{STATUS_LABELS.in_progress}</SelectItem>
+                      <SelectItem value="blocked">{STATUS_LABELS.blocked}</SelectItem>
+                      <SelectItem value="review">{STATUS_LABELS.review}</SelectItem>
+                      <SelectItem value="done">{STATUS_LABELS.done}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Due Date hero */}
+                <div className="flex items-center justify-between gap-3 bg-field-bg rounded-md border border-field-border px-3 py-2">
+                  <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Due</span>
+                  <DueDatePicker
+                    value={dueDate}
+                    status={status}
+                    onChange={handleDueDateChange}
+                    emptyLabel="No due date"
+                    showInlineClear
+                    align="end"
+                    triggerClassName="h-9 px-2"
+                    labelClassName="text-sm font-medium"
+                  />
+                </div>
+              </div>
+
               {/* === WORKFLOW GROUP — 2-column grid === */}
               <div>
                 <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Workflow</h3>
                 <div className="grid grid-cols-2 gap-2.5">
-                    {/* Status */}
-                    <div className="bg-field-bg rounded-md border border-field-border p-2">
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Status</span>
-                      <Select
-                        value={status}
-                        onValueChange={(v) => handleStatusChange(v as TaskStatus)}
-                      >
-                        <SelectTrigger className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todo">{STATUS_LABELS.todo}</SelectItem>
-                          <SelectItem value="in_progress">{STATUS_LABELS.in_progress}</SelectItem>
-                          <SelectItem value="blocked">{STATUS_LABELS.blocked}</SelectItem>
-                          <SelectItem value="review">{STATUS_LABELS.review}</SelectItem>
-                          <SelectItem value="done">{STATUS_LABELS.done}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
                     {/* Priority */}
                     <div className="bg-field-bg rounded-md border border-field-border p-2">
                       <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Priority</span>
@@ -661,30 +682,6 @@ export function TaskDrawer({
                       </Select>
                     </div>
 
-                    {/* Start Date */}
-                    <div className="bg-field-bg rounded-md border border-field-border p-2">
-                      <label htmlFor="start-date" className="text-[11px] text-muted-foreground uppercase tracking-wider">Start</label>
-                      <Input
-                        id="start-date"
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => handleStartDateChange(e.target.value)}
-                        className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5"
-                      />
-                    </div>
-
-                    {/* Due Date */}
-                    <div className="bg-field-bg rounded-md border border-field-border p-2">
-                      <label htmlFor="due-date" className="text-[11px] text-muted-foreground uppercase tracking-wider">Due</label>
-                      <Input
-                        id="due-date"
-                        type="date"
-                        value={dueDate}
-                        onChange={(e) => handleDueDateChange(e.target.value)}
-                        className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5"
-                      />
-                    </div>
-
                     {/* Recurrence */}
                     <div className="bg-field-bg rounded-md border border-field-border p-2">
                       <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Recurrence</span>
@@ -708,6 +705,18 @@ export function TaskDrawer({
                           Repeats {recurrence} after completion
                         </p>
                       )}
+                    </div>
+
+                    {/* Start Date */}
+                    <div className="bg-field-bg rounded-md border border-field-border p-2">
+                      <label htmlFor="start-date" className="text-[11px] text-muted-foreground uppercase tracking-wider">Start</label>
+                      <Input
+                        id="start-date"
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => handleStartDateChange(e.target.value)}
+                        className="w-full h-8 text-sm font-medium border-0 shadow-none bg-transparent hover:bg-muted/50 mt-0.5"
+                      />
                     </div>
 
                     {/* Project */}

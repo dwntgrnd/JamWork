@@ -565,22 +565,22 @@ export function TaskList({
                 </TableHead>
                 <TableHead className="w-8"></TableHead>
                 <TableHead className="w-[35%]">Title</TableHead>
-                {showProjectColumn && (
-                  <TableHead className="w-36 hidden lg:table-cell">
-                    Project
-                  </TableHead>
-                )}
+                <TableHead className="w-24 hidden sm:table-cell">
+                  Due Date
+                </TableHead>
                 <TableHead className="w-32">Status</TableHead>
                 <TableHead className="w-24">Priority</TableHead>
                 <TableHead className="w-20 hidden lg:table-cell">
                   Effort
                 </TableHead>
-                <TableHead className="w-24 hidden sm:table-cell">
+                <TableHead className="w-24 hidden md:table-cell">
                   Assignee
                 </TableHead>
-                <TableHead className="w-24 hidden md:table-cell">
-                  Due Date
-                </TableHead>
+                {showProjectColumn && (
+                  <TableHead className="w-36 hidden lg:table-cell">
+                    Project
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <Droppable droppableId="task-list" isDropDisabled={!isDragEnabled}>
