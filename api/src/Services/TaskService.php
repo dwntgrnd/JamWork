@@ -209,6 +209,10 @@ class TaskService
             ? ($data['notifyEnabled'] ? 1 : 0)
             : (int) $project['default_notify_enabled'];
 
+        // Visibility flags default to 1 (appears everywhere); stored as 0 only when explicitly disabled (CC34).
+        $showOnTimeline = array_key_exists('showOnTimeline', $data) ? ($data['showOnTimeline'] ? 1 : 0) : 1;
+        $includeInReport = array_key_exists('includeInReport', $data) ? ($data['includeInReport'] ? 1 : 0) : 1;
+
         $id = Uuid::uuid4()->toString();
         $sortOrder = TaskModel::getNextSortOrder($data['projectId']);
 
@@ -221,8 +225,8 @@ class TaskService
         $db->beginTransaction();
         try {
             $stmt = $db->prepare(
-                'INSERT INTO tasks (id, title, description, notes, status, priority, effort, due_date, start_date, sort_order, recurrence, sprint_id, project_id, created_by_id, notify_enabled, completed_at)
-                 VALUES (:id, :title, :description, :notes, :status, :priority, :effort, :due_date, :start_date, :sort_order, :recurrence, :sprint_id, :project_id, :created_by_id, :notify_enabled, ' . $completedAtExpr . ')'
+                'INSERT INTO tasks (id, title, description, notes, status, priority, effort, due_date, start_date, sort_order, recurrence, sprint_id, project_id, created_by_id, notify_enabled, show_on_timeline, include_in_report, completed_at)
+                 VALUES (:id, :title, :description, :notes, :status, :priority, :effort, :due_date, :start_date, :sort_order, :recurrence, :sprint_id, :project_id, :created_by_id, :notify_enabled, :show_on_timeline, :include_in_report, ' . $completedAtExpr . ')'
             );
             $stmt->execute([
                 'id' => $id,
@@ -240,6 +244,8 @@ class TaskService
                 'project_id' => $data['projectId'],
                 'created_by_id' => $userId,
                 'notify_enabled' => $notifyEnabled,
+                'show_on_timeline' => $showOnTimeline,
+                'include_in_report' => $includeInReport,
             ]);
 
             if (!empty($assigneeIds)) {
@@ -406,6 +412,14 @@ class TaskService
             $updates[] = 'notify_enabled = :notify_enabled';
             $updateParams['notify_enabled'] = $data['notifyEnabled'] ? 1 : 0;
         }
+        if (array_key_exists('showOnTimeline', $data)) {
+            $updates[] = 'show_on_timeline = :show_on_timeline';
+            $updateParams['show_on_timeline'] = $data['showOnTimeline'] ? 1 : 0;
+        }
+        if (array_key_exists('includeInReport', $data)) {
+            $updates[] = 'include_in_report = :include_in_report';
+            $updateParams['include_in_report'] = $data['includeInReport'] ? 1 : 0;
+        }
 
         $clonedTaskId = null;
 
@@ -478,8 +492,8 @@ class TaskService
                 $cloneSortOrder = TaskModel::getNextSortOrder($existingTask['project_id']);
 
                 $stmt = $db->prepare(
-                    'INSERT INTO tasks (id, title, description, notes, status, priority, effort, due_date, start_date, sort_order, recurrence, sprint_id, project_id, created_by_id, notify_enabled)
-                     VALUES (:id, :title, :description, :notes, :status, :priority, :effort, :due_date, :start_date, :sort_order, :recurrence, :sprint_id, :project_id, :created_by_id, :notify_enabled)'
+                    'INSERT INTO tasks (id, title, description, notes, status, priority, effort, due_date, start_date, sort_order, recurrence, sprint_id, project_id, created_by_id, notify_enabled, show_on_timeline, include_in_report)
+                     VALUES (:id, :title, :description, :notes, :status, :priority, :effort, :due_date, :start_date, :sort_order, :recurrence, :sprint_id, :project_id, :created_by_id, :notify_enabled, :show_on_timeline, :include_in_report)'
                 );
                 $stmt->execute([
                     'id' => $clonedTaskId,
@@ -497,6 +511,8 @@ class TaskService
                     'project_id' => $existingTask['project_id'],
                     'created_by_id' => $userId,
                     'notify_enabled' => (int) $existingTask['notify_enabled'],
+                    'show_on_timeline' => (int) $existingTask['show_on_timeline'],
+                    'include_in_report' => (int) $existingTask['include_in_report'],
                 ]);
 
                 if (!empty($existingAssigneeRows)) {

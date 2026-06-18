@@ -55,6 +55,8 @@ const FIELD_LABELS: Record<string, string> = {
   dueDate: 'Due date',
   assigneeIds: 'Assignees',
   notifyEnabled: 'Notifications',
+  showOnTimeline: 'Timeline visibility',
+  includeInReport: 'Report inclusion',
 };
 
 /** Chrome-free trigger styling shared by the property-row select controls. */
@@ -64,8 +66,8 @@ const GHOST_TRIGGER =
 /**
  * One property row: a fixed-width muted label column and a value column.
  * `align="start"` top-anchors the label so it stays level with the first line
- * when a value wraps (assignees, the notifications caption, the recurrence
- * helper). `labelId` is the id the value control points at via aria-labelledby.
+ * when a value wraps (assignees or the recurrence helper). `labelId` is the id
+ * the value control points at via aria-labelledby.
  */
 function PropertyRow({
   labelId,
@@ -132,6 +134,8 @@ export function TaskDrawer({
   );
   const [sprintId, setSprintId] = useState<string | null>(task?.sprintId || defaultSprintId || null);
   const [notifyEnabled, setNotifyEnabled] = useState(task?.notifyEnabled ?? true);
+  const [showOnTimeline, setShowOnTimeline] = useState(task?.showOnTimeline ?? true);
+  const [includeInReport, setIncludeInReport] = useState(task?.includeInReport ?? true);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>(
     task?.assignees?.map((a) => a.userId) || []
   );
@@ -190,6 +194,36 @@ export function TaskDrawer({
       }
     }
   };
+
+  const handleShowOnTimelineChange = async (value: boolean) => {
+    const prev = showOnTimeline;
+    setShowOnTimeline(value);
+    if (mode === 'edit') {
+      try {
+        await saveField('showOnTimeline', value);
+      } catch {
+        setShowOnTimeline(prev); // revert on failure
+      }
+    }
+  };
+
+  const handleIncludeInReportChange = async (value: boolean) => {
+    const prev = includeInReport;
+    setIncludeInReport(value);
+    if (mode === 'edit') {
+      try {
+        await saveField('includeInReport', value);
+      } catch {
+        setIncludeInReport(prev); // revert on failure
+      }
+    }
+  };
+
+  // The report toggle is relevant only when the parent project is itself in
+  // reports; otherwise it's hidden entirely (the DB value persists). The
+  // project's flag comes from the already-loaded drawer projects list (CC34).
+  const parentProjectInReport =
+    projects.find((p) => p.id === projectId)?.includeInStatusReport === true;
 
   const fetchProjects = async () => {
     try {
@@ -459,6 +493,8 @@ export function TaskDrawer({
         sprintId: sprintId || undefined,
         assigneeIds: selectedAssignees,
         notifyEnabled,
+        ...(showOnTimeline === false ? { showOnTimeline: false } : {}),
+        ...(includeInReport === false ? { includeInReport: false } : {}),
       };
 
       if (mode === 'create') {
@@ -829,19 +865,64 @@ export function TaskDrawer({
                   </div>
                 </PropertyRow>
 
-                {/* Notifications */}
-                <PropertyRow labelId="task-notify-label" label="Notifications" align="start">
-                  <div className="space-y-1 py-1.5">
+                {/* Visibility + Notifications — settings-style toggle rows (CC34) */}
+                <div className="my-2 h-px bg-border" aria-hidden="true" />
+                <div className="space-y-4 py-1">
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium text-muted-foreground">Visibility</p>
+
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <span id="task-show-timeline-label" className="block text-sm font-medium text-foreground">
+                          Show on timeline
+                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          When off, this task won&apos;t appear on the timeline even if dates are set.
+                        </p>
+                      </div>
+                      <Switch
+                        aria-labelledby="task-show-timeline-label"
+                        checked={showOnTimeline}
+                        onCheckedChange={handleShowOnTimelineChange}
+                      />
+                    </div>
+
+                    {parentProjectInReport && (
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <span id="task-include-report-label" className="block text-sm font-medium text-foreground">
+                            Include in status reports
+                          </span>
+                          <p className="text-xs text-muted-foreground">
+                            When off, this task won&apos;t appear in generated reports for this project.
+                          </p>
+                        </div>
+                        <Switch
+                          aria-labelledby="task-include-report-label"
+                          checked={includeInReport}
+                          onCheckedChange={handleIncludeInReportChange}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Notifications — same orientation as the visibility rows */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <span id="task-notify-label" className="block text-sm font-medium text-foreground">
+                        Notifications
+                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        When off, no assignment, removal, or update emails are sent for this task.
+                      </p>
+                    </div>
                     <Switch
                       aria-labelledby="task-notify-label"
                       checked={notifyEnabled}
                       onCheckedChange={handleNotifyEnabledChange}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      When off, no assignment, removal, or update emails are sent for this task.
-                    </p>
                   </div>
-                </PropertyRow>
+                </div>
               </div>
 
               {/* === DESCRIPTION — below the properties, unboxed === */}

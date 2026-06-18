@@ -414,4 +414,76 @@ final class TaskRoutesTest extends IntegrationTestCase
     {
         $this->assertSame(400, $this->request('POST', '/tasks/bad/subtasks', ['title' => 'x'], $this->token)->getStatusCode());
     }
+
+    // === Visibility controls (CC34) =======================================
+
+    public function testCreateDefaultsVisibilityFlagsToTrue(): void
+    {
+        $task = $this->decode($this->request('POST', '/tasks', [
+            'title' => 'T',
+            'projectId' => $this->projectId,
+        ], $this->token))['task'];
+
+        $this->assertArrayHasKey('showOnTimeline', $task);
+        $this->assertArrayHasKey('includeInReport', $task);
+        $this->assertTrue($task['showOnTimeline']);
+        $this->assertTrue($task['includeInReport']);
+    }
+
+    public function testCreateWithShowOnTimelineFalsePersists(): void
+    {
+        $task = $this->decode($this->request('POST', '/tasks', [
+            'title' => 'Hidden from timeline',
+            'projectId' => $this->projectId,
+            'showOnTimeline' => false,
+        ], $this->token))['task'];
+
+        $persisted = $this->db->query("SELECT show_on_timeline FROM tasks WHERE id = '{$task['id']}'")->fetchColumn();
+        $this->assertSame(0, (int) $persisted, 'show_on_timeline stored as 0');
+        $this->assertFalse($task['showOnTimeline'], 'response reflects the stored 0');
+    }
+
+    public function testUpdateIncludeInReportToFalsePersists(): void
+    {
+        $id = $this->seedTask($this->projectId, $this->user['id']);
+
+        $body = $this->decode($this->request('PUT', "/tasks/{$id}", ['includeInReport' => false], $this->token));
+
+        $persisted = $this->db->query("SELECT include_in_report FROM tasks WHERE id = '{$id}'")->fetchColumn();
+        $this->assertSame(0, (int) $persisted, 'include_in_report stored as 0');
+        $this->assertFalse($body['task']['includeInReport'], 'response reflects the stored 0');
+    }
+
+    public function testCreateRejectsNonBooleanVisibilityFlag400(): void
+    {
+        $res = $this->request('POST', '/tasks', [
+            'title' => 'x',
+            'projectId' => $this->projectId,
+            'showOnTimeline' => 'nope',
+        ], $this->token);
+        $this->assertSame(400, $res->getStatusCode());
+    }
+
+    public function testRecurrenceCloneInheritsVisibilityFlags(): void
+    {
+        $id = $this->seedTask($this->projectId, $this->user['id'], [
+            'title' => 'Recurring hidden',
+            'status' => 'todo',
+            'recurrence' => 'weekly',
+            'due_date' => '2026-01-01 09:00:00',
+            'show_on_timeline' => 0,
+            'include_in_report' => 0,
+        ]);
+
+        $body = $this->decode($this->request('PUT', "/tasks/{$id}", ['status' => 'done'], $this->token));
+        $this->assertNotNull($body['clonedTask']);
+
+        $clonedId = $body['clonedTask']['id'];
+        $dbTimeline = $this->db->query("SELECT show_on_timeline FROM tasks WHERE id = '{$clonedId}'")->fetchColumn();
+        $dbReport = $this->db->query("SELECT include_in_report FROM tasks WHERE id = '{$clonedId}'")->fetchColumn();
+        $this->assertSame(0, (int) $dbTimeline, 'clone inherits hidden-from-timeline');
+        $this->assertSame(0, (int) $dbReport, 'clone inherits excluded-from-report');
+        $this->assertFalse($body['clonedTask']['showOnTimeline']);
+        $this->assertFalse($body['clonedTask']['includeInReport']);
+    }
 }

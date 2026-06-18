@@ -326,7 +326,7 @@ class ReportService
         $stmt = $db->prepare(
             'SELECT id, title, status, due_date, completed_at
              FROM tasks
-             WHERE project_id = :pid AND deleted_at IS NULL
+             WHERE project_id = :pid AND deleted_at IS NULL AND include_in_report = 1
              ORDER BY sort_order ASC, created_at DESC'
         );
         $stmt->execute(['pid' => $projectId]);

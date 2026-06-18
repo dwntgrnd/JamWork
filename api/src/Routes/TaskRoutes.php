@@ -127,6 +127,8 @@ class TaskRoutes
                     'assigneeIds' => 'optional|uuid_array',
                     'labelIds' => 'optional|uuid_array',
                     'notifyEnabled' => 'optional|boolean',
+                    'showOnTimeline' => 'optional|boolean',
+                    'includeInReport' => 'optional|boolean',
                 ]);
 
                 if (!empty($errors)) {
@@ -211,6 +213,8 @@ class TaskRoutes
                     'assigneeIds' => 'optional|uuid_array',
                     'labelIds' => 'optional|uuid_array',
                     'notifyEnabled' => 'optional|boolean',
+                    'showOnTimeline' => 'optional|boolean',
+                    'includeInReport' => 'optional|boolean',
                 ]);
 
                 if (!empty($errors)) {
