@@ -20,6 +20,13 @@ class ReportMarkdownRenderer
         $lines[] = '# Status Report — ' . self::date($payload['generatedAt'], 'F j, Y');
         $lines[] = '';
 
+        // Scope note for project-filtered reports (CC36) — a blockquote below the
+        // title. Full reports carry no scope block, so this is skipped entirely.
+        if (!empty($payload['scope']['isFiltered'])) {
+            $lines[] = '> ' . $payload['scope']['note'];
+            $lines[] = '';
+        }
+
         // Global milestone block (always rendered, with an honest empty state).
         $lines[] = "## Milestones (next {$horizon} days)";
         if (empty($payload['milestones'])) {

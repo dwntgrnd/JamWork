@@ -1,13 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
+import { render, screen, cleanup, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import ReportsPage from '@/pages/reports'
 import { useReports, invalidateReports } from '@/hooks/use-reports'
+import { useProjects } from '@/hooks/use-projects'
 import { useAuth } from '@/hooks/use-auth'
 import { apiPost } from '@/lib/api'
 import type { ReportSummary } from '@/types/report'
-import type { UserRole } from '@/types'
+import type { Project, UserRole } from '@/types'
 
 const navigateMock = vi.fn()
 vi.mock('react-router', async (importOriginal) => ({
@@ -19,13 +20,31 @@ vi.mock('@/hooks/use-reports', () => ({
   invalidateReports: vi.fn(() => Promise.resolve()),
   useDeleteReport: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
 }))
+vi.mock('@/hooks/use-projects', () => ({ useProjects: vi.fn() }))
 vi.mock('@/hooks/use-auth', () => ({ useAuth: vi.fn() }))
 vi.mock('@/lib/api', () => ({ apiPost: vi.fn(), getErrorMessage: (e: unknown) => String(e) }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 const mockedUseReports = useReports as ReturnType<typeof vi.fn>
+const mockedUseProjects = useProjects as ReturnType<typeof vi.fn>
 const mockedUseAuth = useAuth as ReturnType<typeof vi.fn>
 const mockedApiPost = apiPost as ReturnType<typeof vi.fn>
+
+const project = (id: string, name: string): Project => ({
+  id,
+  name,
+  includeInStatusReport: true,
+  createdById: 'u1',
+  createdAt: '2026-06-01T00:00:00Z',
+  updatedAt: '2026-06-01T00:00:00Z',
+})
+
+beforeAll(() => {
+  // Radix primitives (the project picker dialog) need these in jsdom.
+  Element.prototype.hasPointerCapture = () => false
+  Element.prototype.releasePointerCapture = () => {}
+  Element.prototype.scrollIntoView = () => {}
+})
 
 const userWithRole = (role: UserRole) => ({
   user: { id: 'u1', email: 'u1@example.com', displayName: 'U1', role },
@@ -47,6 +66,7 @@ describe('ReportsPage — archive', () => {
     navigateMock.mockReset()
     mockedUseReports.mockReset()
     mockedApiPost.mockReset()
+    mockedUseProjects.mockReturnValue({ data: [] })
     mockedUseAuth.mockReturnValue(userWithRole('admin'))
     ;(invalidateReports as ReturnType<typeof vi.fn>).mockClear()
   })
@@ -83,6 +103,24 @@ describe('ReportsPage — archive', () => {
     expect(screen.getByText(/failed to load/i)).toBeInTheDocument()
   })
 
+  it('shows a "Filtered (N of M projects)" badge for filtered reports only', () => {
+    const filtered: ReportSummary = {
+      id: 'rf',
+      generatedAt: '2026-06-12T12:00:00+00:00',
+      type: 'ad_hoc',
+      triggeredBy: { id: 'u1', displayName: 'Ada' },
+      isFiltered: true,
+      includedProjectCount: 3,
+      eligibleProjectCount: 5,
+    }
+    mockedUseReports.mockReturnValue(hookState({ data: [filtered, newer, older] }))
+    renderPage()
+
+    expect(screen.getByText('Filtered (3 of 5 projects)')).toBeInTheDocument()
+    // The plain ad hoc report and the scheduled report carry no Filtered badge.
+    expect(screen.getAllByText(/Filtered/)).toHaveLength(1)
+  })
+
   it('shows the delete control to owner and admin, but not to member', () => {
     mockedUseReports.mockReturnValue(hookState({ data: [newer] }))
 
@@ -104,6 +142,7 @@ describe('ReportsPage — generate', () => {
     navigateMock.mockReset()
     mockedUseReports.mockReturnValue(hookState({ data: [] }))
     mockedApiPost.mockReset()
+    mockedUseProjects.mockReturnValue({ data: [] })
     mockedUseAuth.mockReturnValue(userWithRole('admin'))
     ;(invalidateReports as ReturnType<typeof vi.fn>).mockClear()
   })
@@ -119,5 +158,43 @@ describe('ReportsPage — generate', () => {
     await waitFor(() => expect(mockedApiPost).toHaveBeenCalledWith('/reports'))
     expect(invalidateReports).toHaveBeenCalled()
     expect(navigateMock).toHaveBeenCalledWith('/reports/rNew')
+  })
+})
+
+describe('ReportsPage — project filter', () => {
+  beforeEach(() => {
+    navigateMock.mockReset()
+    mockedUseReports.mockReturnValue(hookState({ data: [] }))
+    mockedApiPost.mockReset()
+    mockedUseAuth.mockReturnValue(userWithRole('admin'))
+    ;(invalidateReports as ReturnType<typeof vi.fn>).mockClear()
+  })
+  afterEach(cleanup)
+
+  it('shows the "choose specific projects" link when 2+ projects are report-eligible', () => {
+    mockedUseProjects.mockReturnValue({ data: [project('p1', 'Apollo'), project('p2', 'Gemini')] })
+    renderPage()
+    expect(screen.getByRole('button', { name: /choose specific projects/i })).toBeInTheDocument()
+  })
+
+  it('hides the link when fewer than 2 projects are eligible', () => {
+    mockedUseProjects.mockReturnValue({ data: [project('p1', 'Apollo')] })
+    renderPage()
+    expect(screen.queryByRole('button', { name: /choose specific projects/i })).not.toBeInTheDocument()
+  })
+
+  it('opens the picker and generates a filtered report with the selected ids', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    mockedUseProjects.mockReturnValue({ data: [project('p1', 'Apollo'), project('p2', 'Gemini')] })
+    mockedApiPost.mockResolvedValue({ report: { id: 'rFiltered' } })
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: /choose specific projects/i }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByLabelText('Gemini')) // uncheck -> only Apollo remains
+    await user.click(within(dialog).getByRole('button', { name: /generate report/i }))
+
+    await waitFor(() => expect(mockedApiPost).toHaveBeenCalledWith('/reports', { projectIds: ['p1'] }))
+    expect(navigateMock).toHaveBeenCalledWith('/reports/rFiltered')
   })
 })

@@ -178,6 +178,42 @@ final class StatusReportAggregatorTest extends TestCase
         $this->assertSame([], $payload['projects'][0]['groups']);
     }
 
+    public function testBuildPayloadAddsScopeNoteWhenFiltered(): void
+    {
+        // A 6th arg (eligible project count) marks the report as project-filtered:
+        // buildPayload then embeds a scope block with a human-readable note.
+        $payload = ReportService::buildPayload(
+            [
+                ['id' => 'p1', 'name' => 'Apollo', 'tasks' => [], 'subtaskCounts' => [], 'assignees' => []],
+                ['id' => 'p2', 'name' => 'Gemini', 'tasks' => [], 'subtaskCounts' => [], 'assignees' => []],
+            ],
+            [],
+            self::NOW,
+            7,
+            90,
+            5
+        );
+
+        $this->assertTrue($payload['scope']['isFiltered']);
+        $this->assertSame(2, $payload['scope']['includedProjectCount']);
+        $this->assertSame(5, $payload['scope']['eligibleProjectCount']);
+        $this->assertSame(
+            'This report includes 2 of 5 eligible projects: Apollo, Gemini.',
+            $payload['scope']['note']
+        );
+    }
+
+    public function testBuildPayloadOmitsScopeWhenUnfiltered(): void
+    {
+        $payload = ReportService::buildPayload(
+            [['id' => 'p1', 'name' => 'Apollo', 'tasks' => [], 'subtaskCounts' => [], 'assignees' => []]],
+            [],
+            self::NOW
+        );
+
+        $this->assertArrayNotHasKey('scope', $payload, 'a full report carries no scope block');
+    }
+
     public function testBuildPayloadEmbedsRenderedCopy(): void
     {
         // Empty-state strings + the Unassigned label live in the payload so the

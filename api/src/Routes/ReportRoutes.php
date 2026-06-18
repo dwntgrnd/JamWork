@@ -23,9 +23,26 @@ class ReportRoutes
     {
         $app->group('/reports', function (RouteCollectorProxy $group) {
 
-            // POST /reports — generate + store; returns the stored object
+            // POST /reports — generate + store; returns the stored object.
+            // Optional body { projectIds: string[] } scopes an ad hoc report to a
+            // subset of report-eligible projects (CC36); omitted/empty = full report.
             $group->post('', function (Request $request, Response $response) {
-                $report = ReportService::generate($request->getAttribute('userId'));
+                $body = $request->getParsedBody();
+                $projectIds = is_array($body) ? ($body['projectIds'] ?? null) : null;
+
+                if ($projectIds !== null && !is_array($projectIds)) {
+                    return self::json($response, ['error' => 'projectIds must be an array of project IDs'], 400);
+                }
+
+                try {
+                    $report = ReportService::generate(
+                        $request->getAttribute('userId'),
+                        projectIds: $projectIds
+                    );
+                } catch (ServiceException $e) {
+                    return self::json($response, ['error' => $e->getMessage()], $e->getStatusCode());
+                }
+
                 return self::json($response, ['report' => $report], 201);
             });
 

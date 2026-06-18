@@ -131,6 +131,40 @@ final class StatusReportMarkdownTest extends TestCase
         $this->assertStringContainsString('CUSTOM UNASSIGNED', ReportMarkdownRenderer::render($payload3));
     }
 
+    public function testFilteredReportRendersScopeBlockquoteBetweenTitleAndMilestones(): void
+    {
+        $payload = $this->payload([$this->project('Apollo', [$this->task('t1', 'todo')])]);
+        $payload['scope'] = [
+            'isFiltered' => true,
+            'includedProjectCount' => 1,
+            'eligibleProjectCount' => 3,
+            'note' => 'This report includes 1 of 3 eligible projects: Apollo.',
+        ];
+
+        $md = ReportMarkdownRenderer::render($payload);
+
+        $this->assertStringContainsString('> This report includes 1 of 3 eligible projects: Apollo.', $md);
+        $this->assertGreaterThan(
+            strpos($md, '# Status Report'),
+            strpos($md, '> This report includes'),
+            'scope note renders below the title'
+        );
+        $this->assertLessThan(
+            strpos($md, '## Milestones'),
+            strpos($md, '> This report includes'),
+            'scope note renders above the milestones block'
+        );
+    }
+
+    public function testFullReportHasNoScopeBlockquote(): void
+    {
+        $md = ReportMarkdownRenderer::render(
+            $this->payload([$this->project('Apollo', [$this->task('t1', 'todo')])])
+        );
+
+        $this->assertStringNotContainsString('This report includes', $md, 'a full report has no scope note');
+    }
+
     public function testStructuralParityWithPayload(): void
     {
         $payload = $this->payload([

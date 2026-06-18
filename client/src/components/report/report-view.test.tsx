@@ -169,6 +169,31 @@ describe('ReportView — task rendering invariants', () => {
   })
 })
 
+describe('ReportView — scope note (filtered reports)', () => {
+  it('renders payload.scope.note verbatim when the report is filtered', () => {
+    render(
+      <ReportView
+        payload={payload({
+          scope: {
+            isFiltered: true,
+            includedProjectCount: 2,
+            eligibleProjectCount: 5,
+            note: 'This report includes 2 of 5 eligible projects: Alpha, Beta.',
+          },
+        })}
+      />,
+    )
+    expect(
+      screen.getByText('This report includes 2 of 5 eligible projects: Alpha, Beta.'),
+    ).toBeInTheDocument()
+  })
+
+  it('renders no scope note for a full report (no scope block)', () => {
+    render(<ReportView payload={payload()} />)
+    expect(screen.queryByText(/This report includes/)).not.toBeInTheDocument()
+  })
+})
+
 describe('ReportView — blind ordering', () => {
   it('renders projects, groups, and tasks in payload order without re-sorting', () => {
     const p = payload({
