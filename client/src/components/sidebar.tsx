@@ -2,8 +2,12 @@ import { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router';
 import { apiPost, apiDelete, getErrorMessage } from '@/lib/api';
 import { useProjects, invalidateProjects } from '@/hooks/use-projects';
+import { useSidebarPreferences, useUpdateSidebarPreferences } from '@/hooks/use-preferences';
+import { ProjectPickerPopover } from '@/components/sidebar/project-picker-popover';
 import { Project } from '@/types';
+import type { SidebarView } from '@/types/preferences';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -65,6 +69,14 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
+  // Sidebar All/Mine filtering (CC37). Preferences load once; switching views
+  // and editing the curated list filter the in-memory project list client-side.
+  const { data: sidebarPrefs } = useSidebarPreferences();
+  const updateSidebarPrefs = useUpdateSidebarPreferences();
+  const view = sidebarPrefs?.view ?? 'all';
+  const pinnedProjects = sidebarPrefs?.pinnedProjects ?? [];
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) {
       setError('Project name is required');
@@ -114,6 +126,22 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
 
   const isActiveProject = (projectId: string) => {
     return pathname.startsWith(`/projects/${projectId}`);
+  };
+
+  // In "Mine" view, render only the curated projects; stale ids (deleted
+  // projects) simply have no match and drop out silently.
+  const pinnedSet = new Set(pinnedProjects);
+  const displayedProjects = view === 'mine' ? projects.filter((p) => pinnedSet.has(p.id)) : projects;
+
+  // Always persist the full sidebar namespace (the server replaces it wholesale).
+  const handleViewChange = (next: SidebarView) => {
+    updateSidebarPrefs.mutate({ view: next, pinnedProjects });
+  };
+  const handleTogglePin = (projectId: string, checked: boolean) => {
+    const next = checked
+      ? [...pinnedProjects, projectId]
+      : pinnedProjects.filter((id) => id !== projectId);
+    updateSidebarPrefs.mutate({ view, pinnedProjects: next });
   };
 
   return (
@@ -380,8 +408,22 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
                     No projects yet
                   </div>
                 )
+              ) : view === 'mine' && displayedProjects.length === 0 ? (
+                !collapsed && (
+                  <div className="text-sm text-muted-foreground text-center py-4 px-2">
+                    No projects selected.{' '}
+                    <button
+                      type="button"
+                      onClick={() => setPickerOpen(true)}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      Edit
+                    </button>{' '}
+                    your list to add projects.
+                  </div>
+                )
               ) : (
-                projects.map((project) => (
+                displayedProjects.map((project) => (
                   <div key={project.id} className="group relative">
                     {collapsed ? (
                       <Tooltip>
@@ -447,6 +489,47 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
               )}
             </div>
           </div>
+
+          {/* All / Mine filter footer (CC37) — fixed below the scrollable list.
+              Hidden when collapsed; filtering still applies to the icon list. */}
+          {!collapsed && (
+            <div className="border-t border-sidebar-border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'text-sm',
+                      view === 'all' ? 'font-medium text-foreground' : 'text-muted-foreground'
+                    )}
+                  >
+                    All
+                  </span>
+                  <Switch
+                    checked={view === 'mine'}
+                    onCheckedChange={(checked) => handleViewChange(checked ? 'mine' : 'all')}
+                    aria-label="Show only my projects"
+                  />
+                  <span
+                    className={cn(
+                      'text-sm',
+                      view === 'mine' ? 'font-medium text-foreground' : 'text-muted-foreground'
+                    )}
+                  >
+                    Mine
+                  </span>
+                </div>
+                {view === 'mine' && (
+                  <ProjectPickerPopover
+                    open={pickerOpen}
+                    onOpenChange={setPickerOpen}
+                    projects={projects}
+                    pinnedProjects={pinnedProjects}
+                    onToggle={handleTogglePin}
+                  />
+                )}
+              </div>
+            </div>
+          )}
         </nav>
       </TooltipProvider>
 
