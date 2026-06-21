@@ -15,6 +15,7 @@ vi.mock('@/hooks/use-projects', () => ({
 vi.mock('@/hooks/use-preferences', () => ({
   useSidebarPreferences: vi.fn(),
   useUpdateSidebarPreferences: vi.fn(),
+  PREFERENCES_KEY: ['preferences', 'sidebar'],
 }));
 vi.mock('@/lib/api', () => ({
   apiPost: vi.fn(),
