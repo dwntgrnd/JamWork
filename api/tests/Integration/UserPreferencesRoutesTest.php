@@ -128,6 +128,34 @@ final class UserPreferencesRoutesTest extends IntegrationTestCase
         $this->assertSame(400, $res->getStatusCode());
     }
 
+    public function testPutRejectsUnknownTopLevelKey(): void
+    {
+        // Only known namespaces are writable; an arbitrary top-level key is
+        // rejected so the store can't become a dumping ground for client data.
+        $res = $this->request('PUT', '/user/preferences', [
+            'theme' => 'dark',
+        ], $this->token);
+        $this->assertSame(400, $res->getStatusCode());
+    }
+
+    public function testPutRejectsNonStringView(): void
+    {
+        // The shared `in:` rule skips non-scalars; the route guards the type so a
+        // non-string view can't slip through as valid.
+        $res = $this->request('PUT', '/user/preferences', [
+            'sidebar' => ['view' => ['mine'], 'pinnedProjects' => []],
+        ], $this->token);
+        $this->assertSame(400, $res->getStatusCode());
+    }
+
+    public function testPutRejectsNonObjectSidebar(): void
+    {
+        $res = $this->request('PUT', '/user/preferences', [
+            'sidebar' => 'nope',
+        ], $this->token);
+        $this->assertSame(400, $res->getStatusCode());
+    }
+
     public function testPutMergesAtNamespaceLevel(): void
     {
         // A sibling top-level namespace must survive a sidebar update.

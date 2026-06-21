@@ -75,18 +75,35 @@ class UserPreferencesRoutes
         return is_array($decoded) ? $decoded : [];
     }
 
+    /** Top-level preference namespaces this endpoint will accept on write. */
+    private const ALLOWED_NAMESPACES = ['sidebar'];
+
     /**
-     * Validate the incoming (partial) preferences object. Only the `sidebar`
-     * namespace is constrained; other top-level keys are opaque and extensible.
-     * Returns a list of {field,message} errors, or null when valid.
+     * Validate the incoming (partial) preferences object. Only known top-level
+     * namespaces are writable — unknown keys are rejected so the store can't be
+     * used as an unbounded dumping ground (a future namespace is added here and
+     * to ALLOWED_NAMESPACES together). The `sidebar` namespace is then
+     * constrained. Returns a list of {field,message} errors, or null when valid.
      */
     private static function validate(array $data): ?array
     {
+        foreach (array_keys($data) as $key) {
+            if (!in_array($key, self::ALLOWED_NAMESPACES, true)) {
+                return [['field' => (string) $key, 'message' => "Unknown preference: {$key}"]];
+            }
+        }
+
         if (!array_key_exists('sidebar', $data)) {
             return null;
         }
         if (!is_array($data['sidebar'])) {
             return [['field' => 'sidebar', 'message' => 'sidebar must be an object']];
+        }
+
+        // `view` must be a string: the shared `in:` rule skips non-scalars, so an
+        // array/object view would otherwise slip through validation as "valid".
+        if (array_key_exists('view', $data['sidebar']) && !is_string($data['sidebar']['view'])) {
+            return [['field' => 'view', 'message' => 'view must be one of: all, mine']];
         }
 
         $errors = Validator::validate($data['sidebar'], [
