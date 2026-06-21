@@ -18,6 +18,7 @@ use JamWork\Routes\ReportScheduleRoutes;
 use JamWork\Routes\TaskLinkRoutes;
 use JamWork\Routes\SprintRoutes;
 use JamWork\Routes\TaskRoutes;
+use JamWork\Routes\UserPreferencesRoutes;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\App;
@@ -84,6 +85,7 @@ class Bootstrap
         TaskRoutes::register($app);
         ReportRoutes::register($app);
         ReportScheduleRoutes::register($app);
+        UserPreferencesRoutes::register($app);
         CronRoutes::register($app);
 
         return $app;
