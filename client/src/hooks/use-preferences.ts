@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { apiGet, apiPut } from '@/lib/api';
 import { queryClient } from '@/lib/query-client';
 import type { SidebarPreferences, SidebarView, UserPreferences } from '@/types/preferences';
@@ -47,6 +48,8 @@ export function useUpdateSidebarPreferences() {
       if (context?.previous !== undefined) {
         queryClient.setQueryData(PREFERENCES_KEY, context.previous);
       }
+      // Don't let the switch silently snap back — say why, and that we reverted.
+      toast.error("Couldn't save your sidebar preferences. The previous setting was restored.");
     },
   });
 }

@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router';
 import { apiPost, apiDelete, getErrorMessage } from '@/lib/api';
 import { useProjects, invalidateProjects } from '@/hooks/use-projects';
-import { useSidebarPreferences, useUpdateSidebarPreferences } from '@/hooks/use-preferences';
+import { useSidebarPreferences, useUpdateSidebarPreferences, PREFERENCES_KEY } from '@/hooks/use-preferences';
+import { queryClient } from '@/lib/query-client';
 import { ProjectPickerPopover } from '@/components/sidebar/project-picker-popover';
 import { Project } from '@/types';
-import type { SidebarView } from '@/types/preferences';
+import type { SidebarPreferences, SidebarView } from '@/types/preferences';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -134,14 +135,21 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   const displayedProjects = view === 'mine' ? projects.filter((p) => pinnedSet.has(p.id)) : projects;
 
   // Always persist the full sidebar namespace (the server replaces it wholesale).
+  // Derive from the freshest cached value rather than the render snapshot, so
+  // back-to-back toggles build on each other instead of overwriting with stale state.
+  const currentPrefs = (): SidebarPreferences =>
+    queryClient.getQueryData<SidebarPreferences>(PREFERENCES_KEY) ?? { view, pinnedProjects };
   const handleViewChange = (next: SidebarView) => {
-    updateSidebarPrefs.mutate({ view: next, pinnedProjects });
+    updateSidebarPrefs.mutate({ ...currentPrefs(), view: next });
   };
   const handleTogglePin = (projectId: string, checked: boolean) => {
-    const next = checked
-      ? [...pinnedProjects, projectId]
-      : pinnedProjects.filter((id) => id !== projectId);
-    updateSidebarPrefs.mutate({ view, pinnedProjects: next });
+    const cur = currentPrefs();
+    updateSidebarPrefs.mutate({
+      view: cur.view,
+      pinnedProjects: checked
+        ? [...cur.pinnedProjects, projectId]
+        : cur.pinnedProjects.filter((id) => id !== projectId),
+    });
   };
 
   return (

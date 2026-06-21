@@ -9,6 +9,7 @@ import {
   PREFERENCES_KEY,
 } from '@/hooks/use-preferences';
 import { apiGet, apiPut } from '@/lib/api';
+import { toast } from 'sonner';
 import type { SidebarPreferences } from '@/types/preferences';
 
 vi.mock('@/lib/api', () => ({
@@ -20,9 +21,11 @@ vi.mock('@/lib/api', () => ({
     status = 0;
   },
 }));
+vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 
 const mockedApiGet = apiGet as ReturnType<typeof vi.fn>;
 const mockedApiPut = apiPut as ReturnType<typeof vi.fn>;
+const mockedToastError = toast.error as ReturnType<typeof vi.fn>;
 
 const wrapper = ({ children }: { children: ReactNode }) =>
   createElement(QueryClientProvider, { client: queryClient }, children);
@@ -32,6 +35,7 @@ describe('use-preferences', () => {
     queryClient.clear();
     mockedApiGet.mockReset();
     mockedApiPut.mockReset();
+    mockedToastError.mockReset();
   });
   afterEach(cleanup);
 
@@ -94,5 +98,7 @@ describe('use-preferences', () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(queryClient.getQueryData(PREFERENCES_KEY)).toEqual(previous);
+    // A failed save surfaces a toast rather than silently snapping back.
+    expect(mockedToastError).toHaveBeenCalled();
   });
 });
