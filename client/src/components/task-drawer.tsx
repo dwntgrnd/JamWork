@@ -687,6 +687,9 @@ export function TaskDrawer({
                 )}
               </div>
 
+              {/* Hairline under the title, separating it from the properties. */}
+              <div className="h-px bg-border" aria-hidden="true" />
+
               {/* === PROPERTIES — one grammar: muted label column + value column === */}
               <div className="space-y-1">
                 {/* Status */}
@@ -711,19 +714,37 @@ export function TaskDrawer({
                   </Select>
                 </PropertyRow>
 
-                {/* Due */}
-                <PropertyRow labelId="task-due-label" label="Due">
-                  <DueDatePicker
-                    value={dueDate}
-                    status={status}
-                    labelledById="task-due-label"
-                    onChange={handleDueDateChange}
-                    emptyLabel="No due date"
-                    showInlineClear
-                    withIcon
-                    triggerClassName="inline-flex h-9 items-center gap-1.5 px-2"
-                    labelClassName="text-sm font-medium"
-                  />
+                {/* Dates — Start → Due read as one range. Inline on the wide
+                    drawer; stacks on the narrow (mobile) drawer at the same
+                    sm breakpoint the Sheet uses to switch width. */}
+                <PropertyRow labelId="task-dates-label" label="Dates" align="start">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                    <span id="task-start-label" className="sr-only">Start date</span>
+                    <DueDatePicker
+                      value={startDate}
+                      plain
+                      labelledById="task-start-label"
+                      onChange={handleStartDateChange}
+                      emptyLabel="No start date"
+                      showInlineClear
+                      withIcon
+                      triggerClassName="inline-flex h-9 items-center gap-1.5 px-2"
+                      labelClassName="text-sm font-medium"
+                    />
+                    <span aria-hidden="true" className="hidden text-muted-foreground sm:inline">→</span>
+                    <DueDatePicker
+                      value={dueDate}
+                      status={status}
+                      labelledById="task-due-label"
+                      onChange={handleDueDateChange}
+                      emptyLabel="No due date"
+                      showInlineClear
+                      withIcon
+                      triggerClassName="inline-flex h-9 items-center gap-1.5 px-2"
+                      labelClassName="text-sm font-medium"
+                    />
+                    <span id="task-due-label" className="sr-only">Due date</span>
+                  </div>
                 </PropertyRow>
 
                 {/* Priority */}
@@ -787,21 +808,6 @@ export function TaskDrawer({
                       ))}
                     </SelectContent>
                   </Select>
-                </PropertyRow>
-
-                {/* Start */}
-                <PropertyRow labelId="task-start-label" label="Start">
-                  <DueDatePicker
-                    value={startDate}
-                    plain
-                    labelledById="task-start-label"
-                    onChange={handleStartDateChange}
-                    emptyLabel="No start date"
-                    showInlineClear
-                    withIcon
-                    triggerClassName="inline-flex h-9 items-center gap-1.5 px-2"
-                    labelClassName="text-sm font-medium"
-                  />
                 </PropertyRow>
 
                 {/* Recurrence */}
@@ -878,65 +884,6 @@ export function TaskDrawer({
                     />
                   </div>
                 </PropertyRow>
-
-                {/* Visibility + Notifications — settings-style toggle rows (CC34) */}
-                <div className="my-2 h-px bg-border" aria-hidden="true" />
-                <div className="space-y-4 py-1">
-                  <div className="space-y-3">
-                    <p className="text-xs font-medium text-muted-foreground">Visibility</p>
-
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-0.5">
-                        <span id="task-show-timeline-label" className="block text-sm font-medium text-foreground">
-                          Show on timeline
-                        </span>
-                        <p className="text-xs text-muted-foreground">
-                          When off, this task won&apos;t appear on the timeline even if dates are set.
-                        </p>
-                      </div>
-                      <Switch
-                        aria-labelledby="task-show-timeline-label"
-                        checked={showOnTimeline}
-                        onCheckedChange={handleShowOnTimelineChange}
-                      />
-                    </div>
-
-                    {parentProjectInReport && (
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-0.5">
-                          <span id="task-include-report-label" className="block text-sm font-medium text-foreground">
-                            Include in status reports
-                          </span>
-                          <p className="text-xs text-muted-foreground">
-                            When off, this task won&apos;t appear in generated reports for this project.
-                          </p>
-                        </div>
-                        <Switch
-                          aria-labelledby="task-include-report-label"
-                          checked={includeInReport}
-                          onCheckedChange={handleIncludeInReportChange}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Notifications — same orientation as the visibility rows */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <span id="task-notify-label" className="block text-sm font-medium text-foreground">
-                        Notifications
-                      </span>
-                      <p className="text-xs text-muted-foreground">
-                        When off, no assignment, removal, or update emails are sent for this task.
-                      </p>
-                    </div>
-                    <Switch
-                      aria-labelledby="task-notify-label"
-                      checked={notifyEnabled}
-                      onCheckedChange={handleNotifyEnabledChange}
-                    />
-                  </div>
-                </div>
               </div>
 
               {/* === DESCRIPTION — below the properties, unboxed === */}
@@ -1046,6 +993,66 @@ export function TaskDrawer({
                   onDelete={handleDeleteLink}
                 />
               )}
+
+              {/* Visibility + Notifications — settings-style toggle rows, anchored
+                  to the bottom of the drawer, below links (CC34, repositioned). */}
+              <div className="h-px bg-border" aria-hidden="true" />
+              <div className="space-y-4 py-1">
+                <div className="space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground">Visibility</p>
+
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <span id="task-show-timeline-label" className="block text-sm font-medium text-foreground">
+                        Show on timeline
+                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        When off, this task won&apos;t appear on the timeline even if dates are set.
+                      </p>
+                    </div>
+                    <Switch
+                      aria-labelledby="task-show-timeline-label"
+                      checked={showOnTimeline}
+                      onCheckedChange={handleShowOnTimelineChange}
+                    />
+                  </div>
+
+                  {parentProjectInReport && (
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <span id="task-include-report-label" className="block text-sm font-medium text-foreground">
+                          Include in status reports
+                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          When off, this task won&apos;t appear in generated reports for this project.
+                        </p>
+                      </div>
+                      <Switch
+                        aria-labelledby="task-include-report-label"
+                        checked={includeInReport}
+                        onCheckedChange={handleIncludeInReportChange}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Notifications — same orientation as the visibility rows */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <span id="task-notify-label" className="block text-sm font-medium text-foreground">
+                      Notifications
+                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      When off, no assignment, removal, or update emails are sent for this task.
+                    </p>
+                  </div>
+                  <Switch
+                    aria-labelledby="task-notify-label"
+                    checked={notifyEnabled}
+                    onCheckedChange={handleNotifyEnabledChange}
+                  />
+                </div>
+              </div>
 
               {/* Error message */}
               {error && (
