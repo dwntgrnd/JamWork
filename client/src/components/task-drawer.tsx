@@ -282,13 +282,14 @@ export function TaskDrawer({
     return false;
   }, [title, description, dueDate, startDate, recurrence, selectedAssignees, mode]);
 
-  const handleClose = () => {
+  const handleClose = async () => {
     // The drawer can be dismissed (click-outside, Esc) without the focused field's
     // blur firing — which would silently drop a pending edit. Flush any in-progress
-    // free-text edit before unmounting. (Selects already save on change.)
+    // free-text edit and AWAIT it before closing, so the parent's on-close refetch
+    // reads the saved value instead of racing the save. (Selects save on change.)
     if (mode === 'edit') {
-      handleTitleBlur();
-      if (isEditingDescription) handleDescriptionBlur();
+      await handleTitleBlur();
+      if (isEditingDescription) await handleDescriptionBlur();
     }
     if (mode === 'create' && hasUnsavedChanges) {
       setShowUnsavedDialog(true);
