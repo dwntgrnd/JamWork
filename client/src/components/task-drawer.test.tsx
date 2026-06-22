@@ -98,4 +98,31 @@ describe('TaskDrawer — autosave on dismiss', () => {
 
     expect(mockApiPut).toHaveBeenCalledWith('/tasks/t1', { description: 'New description' });
   });
+
+  it('waits for the pending save to finish before closing, so the parent refetch sees fresh data', async () => {
+    const user = userEvent.setup();
+    // Hold the PUT open so we can observe ordering.
+    let resolvePut: (v: unknown) => void = () => {};
+    mockApiPut.mockReturnValue(new Promise((r) => { resolvePut = r; }));
+    const onClose = vi.fn();
+    render(<TaskDrawer mode="edit" task={task} onSave={vi.fn()} onClose={onClose} />);
+
+    await user.click(screen.getByText('Old description'));
+    const textarea = screen.getByPlaceholderText('What needs to be done?');
+    await user.clear(textarea);
+    await user.type(textarea, 'New description');
+
+    await act(async () => {
+      sheetOnOpenChange?.(false);
+    });
+    // The save is in flight; the drawer must NOT have closed yet — otherwise the
+    // parent's on-close refetch races the save and reads the stale title.
+    expect(mockApiPut).toHaveBeenCalledWith('/tasks/t1', { description: 'New description' });
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolvePut({});
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
