@@ -90,7 +90,7 @@ export default function ProtectedLayout() {
   ]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       <header className="sticky top-0 bg-header text-header-foreground shadow-[var(--shadow-header)] z-30">
         <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
@@ -174,7 +174,7 @@ export default function ProtectedLayout() {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-h-0">
         <div className="hidden md:block">
           <Sidebar
             collapsed={sidebarCollapsed}
@@ -199,7 +199,7 @@ export default function ProtectedLayout() {
           </>
         )}
 
-        <main className="flex-1 overflow-y-auto" aria-label="Main content">
+        <main className="flex-1 overflow-y-auto min-h-0" aria-label="Main content">
           <Outlet />
         </main>
       </div>
