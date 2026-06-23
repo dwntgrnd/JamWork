@@ -150,10 +150,12 @@ class TaskService
 
         $orderClause = match ($sortBy) {
             'dueDate' => "CASE WHEN t.due_date IS NULL THEN 1 ELSE 0 END {$sortDir}, t.due_date {$sortDir}",
-            'priority' => "t.priority {$sortDir}",
+            // priority/status are enum strings — order by logical rank, not alphabetically.
+            'priority' => "FIELD(t.priority, 'low', 'medium', 'high', 'urgent') {$sortDir}",
+            'status' => "FIELD(t.status, 'todo', 'in_progress', 'blocked', 'review', 'done') {$sortDir}",
+            'effort' => "CASE WHEN t.effort IS NULL THEN 1 ELSE 0 END {$sortDir}, t.effort {$sortDir}",
             'createdAt' => "t.created_at {$sortDir}",
             'title' => "t.title {$sortDir}",
-            'status' => "t.status {$sortDir}",
             default => "t.sort_order {$sortDir}, t.created_at DESC",
         };
 
