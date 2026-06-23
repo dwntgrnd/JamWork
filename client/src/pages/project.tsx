@@ -61,7 +61,7 @@ export default function ProjectPage() {
               projectId={projectId}
             />
           ) : (
-            <TaskFilters filters={filters} onChange={setFilters} showSortControl={false} />
+            <TaskFilters filters={filters} onChange={setFilters} />
           )}
         </div>
 

@@ -58,7 +58,7 @@ export default function AllTasksPage() {
               }}
             />
           ) : (
-            <TaskFilters filters={filters} onChange={setFilters} showSortControl={false} />
+            <TaskFilters filters={filters} onChange={setFilters} />
           )}
         </div>
 

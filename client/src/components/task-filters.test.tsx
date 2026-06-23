@@ -16,14 +16,16 @@ const filters: TaskFilterState = {
   sortDir: 'asc',
 };
 
-describe('TaskFilters sort control', () => {
-  it('shows the "Sort by" dropdown by default', () => {
+describe('TaskFilters', () => {
+  it('renders the status/priority/assignee filters', () => {
     render(<TaskFilters filters={filters} onChange={vi.fn()} />);
-    expect(screen.getByText('Sort by:')).toBeInTheDocument();
+    expect(screen.getByText('Status:')).toBeInTheDocument();
+    expect(screen.getByText('Priority:')).toBeInTheDocument();
+    expect(screen.getByText('Assignee:')).toBeInTheDocument();
   });
 
-  it('hides the "Sort by" dropdown when showSortControl is false', () => {
-    render(<TaskFilters filters={filters} onChange={vi.fn()} showSortControl={false} />);
+  it('does not render a "Sort by" control — list views sort via column headers, and board/timeline ignore sort', () => {
+    render(<TaskFilters filters={filters} onChange={vi.fn()} />);
     expect(screen.queryByText('Sort by:')).not.toBeInTheDocument();
   });
 });
