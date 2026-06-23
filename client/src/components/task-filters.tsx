@@ -19,9 +19,14 @@ interface TaskFiltersProps {
   filters: TaskFilterState;
   onChange: (filters: TaskFilterState) => void;
   hideProjectFilter?: boolean;
+  /**
+   * Show the "Sort by" dropdown. List views (which sort via clickable column
+   * headers) hide it; Board/Timeline keep it since they have no columns.
+   */
+  showSortControl?: boolean;
 }
 
-export function TaskFilters({ filters, onChange }: TaskFiltersProps) {
+export function TaskFilters({ filters, onChange, showSortControl = true }: TaskFiltersProps) {
   const [users, setUsers] = useState<UserSummary[]>([]);
 
   // Compute active filter count (non-default values)
@@ -205,33 +210,35 @@ export function TaskFilters({ filters, onChange }: TaskFiltersProps) {
         <div className="flex-1" />
 
         {/* Sort controls */}
-        <div className="flex items-center gap-2">
-          <Label className="text-sm font-medium text-foreground">Sort by:</Label>
-          <Select value={filters.sortBy} onValueChange={handleSortByChange}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="dueDate">Due Date</SelectItem>
-              <SelectItem value="priority">Priority</SelectItem>
-              <SelectItem value="sortOrder">Manual Order</SelectItem>
-              <SelectItem value="createdAt">Created Date</SelectItem>
-            </SelectContent>
-          </Select>
+        {showSortControl && (
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium text-foreground">Sort by:</Label>
+            <Select value={filters.sortBy} onValueChange={handleSortByChange}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dueDate">Due Date</SelectItem>
+                <SelectItem value="priority">Priority</SelectItem>
+                <SelectItem value="sortOrder">Manual Order</SelectItem>
+                <SelectItem value="createdAt">Created Date</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={toggleSortDirection}
-            className="h-9 w-9 p-0"
-          >
-            {filters.sortDir === 'asc' ? (
-              <ArrowUp className="h-4 w-4" />
-            ) : (
-              <ArrowDown className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleSortDirection}
+              className="h-9 w-9 p-0"
+            >
+              {filters.sortDir === 'asc' ? (
+                <ArrowUp className="h-4 w-4" />
+              ) : (
+                <ArrowDown className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

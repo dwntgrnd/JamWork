@@ -9,7 +9,8 @@ import { Plus } from 'lucide-react';
 import { useFilterParams } from '@/hooks/use-filter-params';
 
 export default function MyTasksPage() {
-  const { filters, setFilters } = useFilterParams({ defaultSortBy: 'dueDate', defaultSortDir: 'asc' });
+  const sortDefaults = { defaultSortBy: 'dueDate', defaultSortDir: 'asc' } as const;
+  const { filters, setFilters } = useFilterParams(sortDefaults);
   const [showTaskDrawer, setShowTaskDrawer] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
@@ -57,13 +58,16 @@ export default function MyTasksPage() {
               }}
             />
           ) : (
-            <TaskFilters filters={filters} onChange={setFilters} />
+            <TaskFilters filters={filters} onChange={setFilters} showSortControl={false} />
           )}
         </div>
 
         <TaskList
           assigneeId="me"
           filters={filters}
+          onFiltersChange={setFilters}
+          defaultSortBy={sortDefaults.defaultSortBy}
+          defaultSortDir={sortDefaults.defaultSortDir}
           refreshKey={refreshKey}
           onRefresh={handleRefresh}
           onSelectionChange={handleSelectionChange}

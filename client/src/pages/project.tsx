@@ -15,7 +15,8 @@ export default function ProjectPage() {
 
   const { project, loading, setProject, refetch } = useProject(projectId);
 
-  const { filters, setFilters } = useFilterParams({ defaultSortBy: 'sortOrder', defaultSortDir: 'asc' });
+  const sortDefaults = { defaultSortBy: 'sortOrder', defaultSortDir: 'asc' } as const;
+  const { filters, setFilters } = useFilterParams(sortDefaults);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
@@ -60,13 +61,16 @@ export default function ProjectPage() {
               projectId={projectId}
             />
           ) : (
-            <TaskFilters filters={filters} onChange={setFilters} />
+            <TaskFilters filters={filters} onChange={setFilters} showSortControl={false} />
           )}
         </div>
 
         <TaskList
           projectId={projectId}
           filters={filters}
+          onFiltersChange={setFilters}
+          defaultSortBy={sortDefaults.defaultSortBy}
+          defaultSortDir={sortDefaults.defaultSortDir}
           refreshKey={refreshKey}
           onRefresh={handleRefresh}
           onSelectionChange={handleSelectionChange}
