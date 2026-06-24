@@ -292,13 +292,13 @@
 .dark {
   /* Soft dark background — the main content stage, lifted above the chrome */
   --background: oklch(0.19 0.015 265);
-  --foreground: oklch(0.95 0 0);
+  --foreground: oklch(0.90 0 0);
 
   /* Cards/popovers slightly lighter for depth */
   --card: oklch(0.20 0.015 265);
-  --card-foreground: oklch(0.95 0 0);
+  --card-foreground: oklch(0.90 0 0);
   --popover: oklch(0.20 0.015 265);
-  --popover-foreground: oklch(0.95 0 0);
+  --popover-foreground: oklch(0.90 0 0);
 
   /* Primary — light for contrast on dark */
   --primary: oklch(0.85 0 0);
@@ -306,11 +306,11 @@
 
   /* Secondary/Muted/Accent */
   --secondary: oklch(0.22 0.015 265);
-  --secondary-foreground: oklch(0.95 0 0);
+  --secondary-foreground: oklch(0.90 0 0);
   --muted: oklch(0.22 0.015 265);
   --muted-foreground: oklch(0.65 0 0);
   --accent: oklch(0.22 0.015 265);
-  --accent-foreground: oklch(0.95 0 0);
+  --accent-foreground: oklch(0.90 0 0);
 
   /* Destructive — coral (slightly brighter in dark) */
   --destructive: oklch(0.65 0.22 15);
@@ -354,7 +354,7 @@
 
   /* Info/Warning */
   --info: oklch(0.60 0.16 305);
-  --info-foreground: oklch(0.95 0 0);
+  --info-foreground: oklch(0.90 0 0);
   --warning: oklch(0.82 0.16 80);
   --warning-foreground: oklch(0.20 0.05 80);
 
@@ -363,23 +363,23 @@
   --urgency-overdue: oklch(0.65 0.22 15);
 
   /* Header chrome — darkest branded layer */
-  --header: oklch(0.11 0.02 265);
-  --header-foreground: oklch(0.92 0.01 265);
+  --header: oklch(0.09 0.02 265);
+  --header-foreground: oklch(0.90 0.01 265);
   --header-muted: oklch(0.60 0.02 265);
-  --header-border: oklch(0.30 0.015 265);
+  --header-border: oklch(0.34 0.015 265);
 
   /* Sidebar count badge */
   --sidebar-count-bg: oklch(0.25 0.01 265);
   --sidebar-count-fg: oklch(0.85 0 0);
 
   /* Sidebar — mid-dark panel between the header and the content */
-  --sidebar: oklch(0.14 0.015 265);
-  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar: oklch(0.13 0.015 265);
+  --sidebar-foreground: oklch(0.90 0 0);
   --sidebar-primary: oklch(0.76 0.13 192);
-  --sidebar-primary-foreground: oklch(0.95 0 0);
+  --sidebar-primary-foreground: oklch(0.90 0 0);
   --sidebar-accent: oklch(0.20 0.020 265);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.30 0.015 265);
+  --sidebar-accent-foreground: oklch(0.90 0 0);
+  --sidebar-border: oklch(0.34 0.015 265);
   --sidebar-ring: oklch(0.76 0.13 192);
 
   /* Status colors — ghost style (dark) */
