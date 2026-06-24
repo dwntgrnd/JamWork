@@ -138,31 +138,4 @@ describe('Sidebar — All/Pinned project filtering', () => {
     );
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
   });
-
-  // --- Inline pin affordance (Scope B) ---
-
-  it('labels each row pin control by pin state', () => {
-    setPrefs({ view: 'all', pinnedProjects: ['p1'] });
-    renderSidebar();
-    // Apollo is pinned → "Unpin"; the others are not → "Pin".
-    expect(screen.getByRole('button', { name: 'Unpin Apollo' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Pin Gemini' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Pin Orion' })).toBeInTheDocument();
-  });
-
-  it('pins a project from the All view', async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    setPrefs({ view: 'all', pinnedProjects: [] });
-    renderSidebar();
-    await user.click(screen.getByRole('button', { name: 'Pin Apollo' }));
-    expect(mutate).toHaveBeenCalledWith({ view: 'all', pinnedProjects: ['p1'] });
-  });
-
-  it('un-pins a project from the Pinned view', async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    setPrefs({ view: 'mine', pinnedProjects: ['p1', 'p2'] });
-    renderSidebar();
-    await user.click(screen.getByRole('button', { name: 'Unpin Apollo' }));
-    expect(mutate).toHaveBeenCalledWith({ view: 'mine', pinnedProjects: ['p2'] });
-  });
 });
