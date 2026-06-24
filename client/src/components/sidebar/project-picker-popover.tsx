@@ -25,7 +25,7 @@ interface ProjectPickerPopoverProps {
 }
 
 /**
- * Curated-project picker for the sidebar "Mine" view (CC37). Anchored to the
+ * Curated-project picker for the sidebar "Pinned" view (CC37). Anchored to the
  * "Edit" link in the sidebar footer. Each checkbox toggle applies immediately
  * (the parent persists optimistically); "Done" just closes the popover.
  */
@@ -50,7 +50,7 @@ export function ProjectPickerPopover({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64">
         <PopoverHeader className="mb-3">
-          <PopoverTitle>My Projects</PopoverTitle>
+          <PopoverTitle>Pinned Projects</PopoverTitle>
         </PopoverHeader>
 
         <div className="max-h-64 space-y-2.5 overflow-y-auto">
