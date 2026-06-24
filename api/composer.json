@@ -23,6 +23,13 @@
       "Tests\\": "tests/"
     }
   },
+  "config": {
+    "audit": {
+      "ignore": {
+        "CVE-2026-48157": "Reflected XSS in Slim's HtmlErrorRenderer (GHSA-53h4-8rc4-f539, affects slim/slim <=4.15.1). Not exploitable in this app: the detailed HTML error renderer is enabled only when APP_ENV=development (src/Bootstrap.php); production runs with error details off. TODO: bump slim/slim to a patched release and remove this ignore."
+      }
+    }
+  },
   "scripts": {
     "test": "phpunit"
   }
