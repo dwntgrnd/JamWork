@@ -44,6 +44,7 @@ import {
   List,
   Folder,
   Plus,
+  Pin,
   Trash2,
   Calendar,
   GanttChart,
@@ -418,20 +419,28 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
                 )
               ) : view === 'mine' && displayedProjects.length === 0 ? (
                 !collapsed && (
-                  <div className="text-sm text-muted-foreground text-center py-4 px-2">
-                    No projects selected.{' '}
+                  <div className="text-center py-4 px-2 space-y-2">
+                    <p className="text-sm text-muted-foreground">No pinned projects yet.</p>
+                    <Button
+                      size="sm"
+                      onClick={() => setPickerOpen(true)}
+                      className="w-full"
+                    >
+                      Pin projects
+                    </Button>
                     <button
                       type="button"
-                      onClick={() => setPickerOpen(true)}
-                      className="text-primary underline-offset-4 hover:underline"
+                      onClick={() => handleViewChange('all')}
+                      className="text-xs text-muted-foreground underline-offset-4 hover:underline hover:text-foreground"
                     >
-                      Edit
-                    </button>{' '}
-                    your list to add projects.
+                      Show all projects
+                    </button>
                   </div>
                 )
               ) : (
-                displayedProjects.map((project) => (
+                displayedProjects.map((project) => {
+                  const isPinned = pinnedSet.has(project.id);
+                  return (
                   <div key={project.id} className="group relative">
                     {collapsed ? (
                       <Tooltip>
@@ -482,6 +491,23 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
                     )}
 
                     {!collapsed && (
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePin(project.id, !isPinned)}
+                        aria-label={isPinned ? `Unpin ${project.name}` : `Pin ${project.name}`}
+                        aria-pressed={isPinned}
+                        className={cn(
+                          "absolute right-8 top-1/2 -translate-y-1/2 inline-flex h-6 w-6 items-center justify-center rounded transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                          isPinned
+                            ? "text-sidebar-primary opacity-100"
+                            : "text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                        )}
+                      >
+                        <Pin className={cn("h-3.5 w-3.5", isPinned && "fill-current")} />
+                      </button>
+                    )}
+
+                    {!collapsed && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -493,7 +519,8 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
                       </Button>
                     )}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -515,7 +542,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
                   <Switch
                     checked={view === 'mine'}
                     onCheckedChange={(checked) => handleViewChange(checked ? 'mine' : 'all')}
-                    aria-label="Show only my projects"
+                    aria-label="Show only pinned projects"
                   />
                   <span
                     className={cn(
@@ -523,7 +550,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
                       view === 'mine' ? 'font-medium text-foreground' : 'text-muted-foreground'
                     )}
                   >
-                    Mine
+                    Pinned
                   </span>
                 </div>
                 {view === 'mine' && (

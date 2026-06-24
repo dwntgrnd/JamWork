@@ -55,7 +55,7 @@ function renderSidebar() {
   );
 }
 
-describe('Sidebar — All/Mine project filtering', () => {
+describe('Sidebar — All/Pinned project filtering', () => {
   let mutate: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -76,7 +76,7 @@ describe('Sidebar — All/Mine project filtering', () => {
     expect(screen.getByText('Orion')).toBeInTheDocument();
   });
 
-  it('filters to the curated set in Mine view', () => {
+  it('filters to the curated set in Pinned view', () => {
     setPrefs({ view: 'mine', pinnedProjects: ['p1'] });
     renderSidebar();
     expect(screen.getByText('Apollo')).toBeInTheDocument();
@@ -84,10 +84,10 @@ describe('Sidebar — All/Mine project filtering', () => {
     expect(screen.queryByText('Orion')).not.toBeInTheDocument();
   });
 
-  it('shows the empty state in Mine view with no curated projects', () => {
+  it('shows the empty state in Pinned view with no curated projects', () => {
     setPrefs({ view: 'mine', pinnedProjects: [] });
     renderSidebar();
-    expect(screen.getByText(/No projects selected/)).toBeInTheDocument();
+    expect(screen.getByText(/No pinned projects yet/)).toBeInTheDocument();
     expect(screen.queryByText('Apollo')).not.toBeInTheDocument();
   });
 
@@ -98,38 +98,71 @@ describe('Sidebar — All/Mine project filtering', () => {
     expect(screen.queryByText('Gemini')).not.toBeInTheDocument();
   });
 
-  it('persists the new view when the toggle is switched to Mine', async () => {
+  it('persists the new view when the toggle is switched to Pinned', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderSidebar();
     await user.click(screen.getByRole('switch'));
     expect(mutate).toHaveBeenCalledWith({ view: 'mine', pinnedProjects: [] });
   });
 
-  it('opens the project picker from the footer Edit link in Mine view', async () => {
+  it('opens the project picker from the footer Edit link in Pinned view', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     setPrefs({ view: 'mine', pinnedProjects: ['p1'] });
     renderSidebar();
-    expect(screen.queryByText('My Projects')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pinned Projects')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Edit' }));
-    expect(screen.getByText('My Projects')).toBeInTheDocument();
+    expect(screen.getByText('Pinned Projects')).toBeInTheDocument();
   });
 
-  it('opens the picker from the empty-state Edit link', async () => {
+  it('opens the picker from the empty-state "Pin projects" button', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     setPrefs({ view: 'mine', pinnedProjects: [] });
     renderSidebar();
-    // Two "Edit" affordances in this state (empty-state message + footer); the
-    // first in DOM order is the empty-state link.
-    await user.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
-    expect(screen.getByText('My Projects')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Pin projects' }));
+    expect(screen.getByText('Pinned Projects')).toBeInTheDocument();
   });
 
-  it('hides the All/Mine footer when the sidebar is collapsed', () => {
+  it('switches back to All from the empty-state "Show all projects" link', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    setPrefs({ view: 'mine', pinnedProjects: [] });
+    renderSidebar();
+    await user.click(screen.getByRole('button', { name: 'Show all projects' }));
+    expect(mutate).toHaveBeenCalledWith({ view: 'all', pinnedProjects: [] });
+  });
+
+  it('hides the All/Pinned footer when the sidebar is collapsed', () => {
     render(
       <MemoryRouter initialEntries={['/my-tasks']}>
         <Sidebar collapsed onToggle={() => {}} />
       </MemoryRouter>,
     );
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  });
+
+  // --- Inline pin affordance (Scope B) ---
+
+  it('labels each row pin control by pin state', () => {
+    setPrefs({ view: 'all', pinnedProjects: ['p1'] });
+    renderSidebar();
+    // Apollo is pinned → "Unpin"; the others are not → "Pin".
+    expect(screen.getByRole('button', { name: 'Unpin Apollo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pin Gemini' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pin Orion' })).toBeInTheDocument();
+  });
+
+  it('pins a project from the All view', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    setPrefs({ view: 'all', pinnedProjects: [] });
+    renderSidebar();
+    await user.click(screen.getByRole('button', { name: 'Pin Apollo' }));
+    expect(mutate).toHaveBeenCalledWith({ view: 'all', pinnedProjects: ['p1'] });
+  });
+
+  it('un-pins a project from the Pinned view', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    setPrefs({ view: 'mine', pinnedProjects: ['p1', 'p2'] });
+    renderSidebar();
+    await user.click(screen.getByRole('button', { name: 'Unpin Apollo' }));
+    expect(mutate).toHaveBeenCalledWith({ view: 'mine', pinnedProjects: ['p2'] });
   });
 });

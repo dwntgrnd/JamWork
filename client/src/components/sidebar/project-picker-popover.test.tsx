@@ -40,7 +40,7 @@ describe('ProjectPickerPopover', () => {
 
   it('shows every workspace project with check state from pinnedProjects', () => {
     renderPicker(['p1', 'p3']);
-    expect(screen.getByText('My Projects')).toBeInTheDocument();
+    expect(screen.getByText('Pinned Projects')).toBeInTheDocument();
     expect(screen.getByLabelText('Apollo')).toBeChecked();
     expect(screen.getByLabelText('Gemini')).not.toBeChecked();
     expect(screen.getByLabelText('Orion')).toBeChecked();
