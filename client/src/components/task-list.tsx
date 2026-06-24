@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { TaskDrawer } from "@/components/task-drawer";
 import { TaskTableRow } from "@/components/task-table-row";
+import { SortableTableHead } from "@/components/sortable-table-head";
 import { AddTaskRow } from "@/components/add-task-row";
 import { TaskListEmptyState } from "@/components/task-list-empty";
 import { TaskLoadError } from "@/components/task-load-error";
@@ -32,6 +33,10 @@ interface TaskListProps {
   projectId?: string;
   assigneeId?: string;
   filters: TaskFilterState;
+  onFiltersChange: (filters: TaskFilterState) => void;
+  /** The page's default order — where a header's "clear" (3rd click) returns to. */
+  defaultSortBy: TaskFilterState["sortBy"];
+  defaultSortDir: TaskFilterState["sortDir"];
   refreshKey?: number;
   onRefresh?: () => void;
   onSelectionChange?: (selectedIds: Set<string>, selectedTasks: Task[]) => void;
@@ -46,11 +51,22 @@ export function TaskList({
   projectId,
   assigneeId,
   filters,
+  onFiltersChange,
+  defaultSortBy,
+  defaultSortDir,
   refreshKey,
   onRefresh,
   onSelectionChange,
 }: TaskListProps) {
   const { user } = useAuth();
+
+  // Shared wiring for the sortable column headers.
+  const sortHeadProps = {
+    filters,
+    onFiltersChange,
+    defaultSortBy,
+    defaultSortDir,
+  };
 
   // Server-side query params — TaskList sends its filters/sort to the API.
   // The old code appended both the assigneeId prop and filters.assigneeId; PHP
@@ -564,15 +580,36 @@ export function TaskList({
                   />
                 </TableHead>
                 <TableHead className="w-8"></TableHead>
-                <TableHead className="w-[35%]">Title</TableHead>
-                <TableHead className="w-24 hidden sm:table-cell">
-                  Due Date
-                </TableHead>
-                <TableHead className="w-32">Status</TableHead>
-                <TableHead className="w-24">Priority</TableHead>
-                <TableHead className="w-20 hidden lg:table-cell">
-                  Effort
-                </TableHead>
+                <SortableTableHead
+                  label="Title"
+                  column="title"
+                  className="w-[35%]"
+                  {...sortHeadProps}
+                />
+                <SortableTableHead
+                  label="Due Date"
+                  column="dueDate"
+                  className="w-24 hidden sm:table-cell"
+                  {...sortHeadProps}
+                />
+                <SortableTableHead
+                  label="Status"
+                  column="status"
+                  className="w-32"
+                  {...sortHeadProps}
+                />
+                <SortableTableHead
+                  label="Priority"
+                  column="priority"
+                  className="w-24"
+                  {...sortHeadProps}
+                />
+                <SortableTableHead
+                  label="Effort"
+                  column="effort"
+                  className="w-20 hidden lg:table-cell"
+                  {...sortHeadProps}
+                />
                 <TableHead className="w-24 hidden md:table-cell">
                   Assignee
                 </TableHead>

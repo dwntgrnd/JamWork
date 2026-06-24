@@ -192,6 +192,6 @@ export interface TaskFilterState {
   assigneeId?: string;
   sprintId?: string | null;
   showCompleted: boolean;
-  sortBy: "dueDate" | "priority" | "sortOrder" | "createdAt";
+  sortBy: "title" | "dueDate" | "status" | "priority" | "effort" | "sortOrder" | "createdAt";
   sortDir: "asc" | "desc";
 }

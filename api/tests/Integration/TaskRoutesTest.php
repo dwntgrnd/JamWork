@@ -99,6 +99,59 @@ final class TaskRoutesTest extends IntegrationTestCase
         $this->assertSame('mine', $body['tasks'][0]['title']);
     }
 
+    // === GET /tasks (sorting) =============================================
+
+    public function testListSortByPriorityDescIsBySeverityNotAlphabetical(): void
+    {
+        // Seeded in scrambled order; sort_order matches insertion so a wrong
+        // ORDER BY (alphabetical: high, low, medium, urgent) is clearly distinguishable.
+        $this->seedTask($this->projectId, $this->user['id'], ['priority' => 'low', 'sort_order' => 0]);
+        $this->seedTask($this->projectId, $this->user['id'], ['priority' => 'urgent', 'sort_order' => 1]);
+        $this->seedTask($this->projectId, $this->user['id'], ['priority' => 'medium', 'sort_order' => 2]);
+        $this->seedTask($this->projectId, $this->user['id'], ['priority' => 'high', 'sort_order' => 3]);
+
+        $body = $this->decode($this->request('GET', '/tasks?sortBy=priority&sortDir=desc', null, $this->token));
+        $this->assertSame(['urgent', 'high', 'medium', 'low'], array_column($body['tasks'], 'priority'));
+    }
+
+    public function testListSortByPriorityAscIsBySeverity(): void
+    {
+        $this->seedTask($this->projectId, $this->user['id'], ['priority' => 'urgent', 'sort_order' => 0]);
+        $this->seedTask($this->projectId, $this->user['id'], ['priority' => 'low', 'sort_order' => 1]);
+        $this->seedTask($this->projectId, $this->user['id'], ['priority' => 'high', 'sort_order' => 2]);
+        $this->seedTask($this->projectId, $this->user['id'], ['priority' => 'medium', 'sort_order' => 3]);
+
+        $body = $this->decode($this->request('GET', '/tasks?sortBy=priority&sortDir=asc', null, $this->token));
+        $this->assertSame(['low', 'medium', 'high', 'urgent'], array_column($body['tasks'], 'priority'));
+    }
+
+    public function testListSortByStatusIsWorkflowOrderNotAlphabetical(): void
+    {
+        // workflow order: todo, in_progress, blocked, review, done
+        $this->seedTask($this->projectId, $this->user['id'], ['status' => 'done', 'sort_order' => 0]);
+        $this->seedTask($this->projectId, $this->user['id'], ['status' => 'todo', 'sort_order' => 1]);
+        $this->seedTask($this->projectId, $this->user['id'], ['status' => 'review', 'sort_order' => 2]);
+        $this->seedTask($this->projectId, $this->user['id'], ['status' => 'in_progress', 'sort_order' => 3]);
+        $this->seedTask($this->projectId, $this->user['id'], ['status' => 'blocked', 'sort_order' => 4]);
+
+        $body = $this->decode($this->request('GET', '/tasks?sortBy=status&sortDir=asc', null, $this->token));
+        $this->assertSame(
+            ['todo', 'in_progress', 'blocked', 'review', 'done'],
+            array_column($body['tasks'], 'status')
+        );
+    }
+
+    public function testListSortByEffortAscPutsNullsLast(): void
+    {
+        $this->seedTask($this->projectId, $this->user['id'], ['effort' => 8, 'sort_order' => 0]);
+        $this->seedTask($this->projectId, $this->user['id'], ['effort' => null, 'sort_order' => 1]);
+        $this->seedTask($this->projectId, $this->user['id'], ['effort' => 1, 'sort_order' => 2]);
+        $this->seedTask($this->projectId, $this->user['id'], ['effort' => 4, 'sort_order' => 3]);
+
+        $body = $this->decode($this->request('GET', '/tasks?sortBy=effort&sortDir=asc', null, $this->token));
+        $this->assertSame([1, 4, 8, null], array_column($body['tasks'], 'effort'));
+    }
+
     // === POST /tasks (create) =============================================
 
     public function testCreateMinimal(): void
