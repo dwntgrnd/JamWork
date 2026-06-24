@@ -91,7 +91,7 @@ export default function ProtectedLayout() {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
-      <header className="sticky top-0 bg-header text-header-foreground shadow-[var(--shadow-header)] z-30">
+      <header className="sticky top-0 bg-header text-header-foreground border-b border-header-border shadow-[var(--shadow-header)] z-30">
         <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <Button
