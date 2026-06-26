@@ -3,6 +3,12 @@ import { Link, useSearchParams } from 'react-router';
 import { Project } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Plus, Calendar, Settings } from 'lucide-react';
 import { ProjectSettingsDialog } from '@/components/project-settings-dialog';
 import { TaskDrawer } from '@/components/task-drawer';
@@ -68,14 +74,21 @@ export function ProjectHeader({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowSettings(true)}
-            aria-label="Project settings"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowSettings(true)}
+                  aria-label="Project settings"
+                >
+                  <Settings className="size-6" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Project settings</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button
             variant="emphasis"
             className="rounded-lg px-5 gap-2 font-semibold"
