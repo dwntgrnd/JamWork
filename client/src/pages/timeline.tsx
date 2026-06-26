@@ -7,7 +7,7 @@ export default function GlobalTimelinePage() {
 
   return (
     <div className="p-8">
-      <div className="max-w-7xl mx-auto">
+      <div>
         <div className="mb-6">
           <h2 className="text-3xl font-bold text-foreground">Timeline</h2>
           <p className="text-sm text-muted-foreground mt-1">Tasks across all projects</p>

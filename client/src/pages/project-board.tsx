@@ -20,7 +20,7 @@ export default function BoardPage() {
 
   return (
     <div className="p-8">
-      <div className="max-w-7xl mx-auto">
+      <div>
         <ProjectHeader
           project={project}
           activeView="board"
