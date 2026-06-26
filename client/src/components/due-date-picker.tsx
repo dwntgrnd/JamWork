@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { Calendar, X } from "lucide-react";
-import { formatDate, getDateUrgencyInfo, parseLocalDate } from "@/lib/date-utils";
+import { formatDate, getDateUrgencyInfo, parseLocalDate, toInputValue } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import {
   Popover,
@@ -35,15 +35,6 @@ interface DueDatePickerProps {
   labelledById?: string;
   /** Show a leading calendar icon to signal the value is an editable date. */
   withIcon?: boolean;
-}
-
-/** Coerces a value to the "YYYY-MM-DD" string a native date input expects. */
-function toInputValue(value?: string | Date | null): string {
-  if (!value) return "";
-  if (value instanceof Date) return value.toISOString().split("T")[0];
-  return /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? value
-    : new Date(value).toISOString().split("T")[0];
 }
 
 /**

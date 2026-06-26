@@ -4,6 +4,7 @@ import {
   isThisWeek,
   isSoon,
   formatDate,
+  toInputValue,
 } from '@/lib/date-utils';
 
 // Anchor "today" to a fixed local date so every relative date below is
@@ -146,5 +147,30 @@ describe('isSoon — 7 to 14 days from today inclusive', () => {
     expect(isSoon(daysFromToday(7))).toBe(true);
     expect(isSoon(daysFromToday(10))).toBe(true);
     expect(isSoon(daysFromToday(14))).toBe(true);
+  });
+});
+
+describe('toInputValue', () => {
+  it('returns "" for empty values', () => {
+    expect(toInputValue(undefined)).toBe('');
+    expect(toInputValue(null)).toBe('');
+    expect(toInputValue('')).toBe('');
+  });
+
+  it('passes through YYYY-MM-DD strings unchanged', () => {
+    expect(toInputValue('2026-06-15')).toBe('2026-06-15');
+  });
+
+  it('formats ISO strings and Date objects to YYYY-MM-DD', () => {
+    expect(toInputValue('2026-06-15T00:00:00+00:00')).toBe('2026-06-15');
+    expect(toInputValue(new Date('2026-06-15T00:00:00Z'))).toBe('2026-06-15');
+  });
+
+  it('returns "" for invalid dates instead of throwing', () => {
+    // The production incident: a zero-date serialized to '-001-11-30T...', which
+    // new Date() rejects — the old code called .toISOString() on it and threw.
+    expect(toInputValue('-001-11-30T00:00:00+00:00')).toBe('');
+    expect(toInputValue('not a date')).toBe('');
+    expect(toInputValue(new Date('nope'))).toBe('');
   });
 });

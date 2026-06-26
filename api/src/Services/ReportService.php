@@ -3,6 +3,7 @@
 namespace JamWork\Services;
 
 use JamWork\Lib\Database;
+use JamWork\Lib\Validator;
 use JamWork\Models\TaskModel;
 use PDO;
 use Ramsey\Uuid\Uuid;
@@ -86,7 +87,7 @@ class ReportService
                 'id' => $id,
                 'title' => $t['title'],
                 'assignees' => $assignees[$id] ?? [],
-                'dueDate' => !empty($t['due_date']) ? date('c', strtotime($t['due_date'])) : null,
+                'dueDate' => Validator::toIso8601($t['due_date'] ?? null),
                 'overdue' => self::isOverdue($status, $t['due_date'] ?? null, $nowTs),
                 'subtasks' => ($count && $count['total'] > 0)
                     ? ['completed' => (int) $count['completed'], 'total' => (int) $count['total']]
