@@ -43,6 +43,7 @@ export function ProjectSettingsDialog({
   const [sprintPlanning, setSprintPlanning] = useState(project.sprintPlanning !== false);
   const [defaultNotifyEnabled, setDefaultNotifyEnabled] = useState(project.defaultNotifyEnabled !== false);
   const [includeInStatusReport, setIncludeInStatusReport] = useState(project.includeInStatusReport !== false);
+  const [includeInMasterTimeline, setIncludeInMasterTimeline] = useState(project.includeInMasterTimeline !== false);
   const [saving, setSaving] = useState(false);
 
   // Re-sync form when a different project is opened or the dialog re-opens.
@@ -55,6 +56,7 @@ export function ProjectSettingsDialog({
       setSprintPlanning(project.sprintPlanning !== false);
       setDefaultNotifyEnabled(project.defaultNotifyEnabled !== false);
       setIncludeInStatusReport(project.includeInStatusReport !== false);
+      setIncludeInMasterTimeline(project.includeInMasterTimeline !== false);
     }
   }, [open, project]);
 
@@ -76,6 +78,7 @@ export function ProjectSettingsDialog({
           sprintPlanning,
           defaultNotifyEnabled,
           includeInStatusReport,
+          includeInMasterTimeline,
         }
       );
       invalidateProjects();
@@ -186,6 +189,21 @@ export function ProjectSettingsDialog({
               id="settings-include-in-status-report"
               checked={includeInStatusReport}
               onCheckedChange={setIncludeInStatusReport}
+            />
+          </div>
+
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="settings-include-in-master-timeline">Include in master timeline</Label>
+              <p className="text-xs text-muted-foreground">
+                When off, this project is hidden from the all-projects Timeline view. Its own
+                Timeline tab is unaffected.
+              </p>
+            </div>
+            <Switch
+              id="settings-include-in-master-timeline"
+              checked={includeInMasterTimeline}
+              onCheckedChange={setIncludeInMasterTimeline}
             />
           </div>
         </div>

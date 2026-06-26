@@ -32,6 +32,7 @@ class ProjectRoutes
             'endDate' => $row['end_date'] ? date('c', strtotime($row['end_date'])) : null,
             'sprintPlanning' => (bool) $row['sprint_planning'],
             'includeInStatusReport' => (bool) ($row['include_in_status_report'] ?? 1),
+            'includeInMasterTimeline' => (bool) ($row['include_in_master_timeline'] ?? 1),
             'defaultNotifyEnabled' => (bool) ($row['default_notify_enabled'] ?? 1),
             'createdAt' => date('c', strtotime($row['created_at'])),
             'updatedAt' => date('c', strtotime($row['updated_at'])),
@@ -77,6 +78,7 @@ class ProjectRoutes
                     'endDate' => 'optional|iso8601',
                     'sprintPlanning' => 'optional|boolean',
                     'includeInStatusReport' => 'optional|boolean',
+                    'includeInMasterTimeline' => 'optional|boolean',
                     'defaultNotifyEnabled' => 'optional|boolean',
                 ]);
 
@@ -102,8 +104,8 @@ class ProjectRoutes
                 $id = Uuid::uuid4()->toString();
 
                 $stmt = $db->prepare(
-                    'INSERT INTO projects (id, name, description, start_date, end_date, sprint_planning, include_in_status_report, default_notify_enabled, created_by_id)
-                     VALUES (:id, :name, :description, :start_date, :end_date, :sprint_planning, :include_in_status_report, :default_notify_enabled, :created_by_id)'
+                    'INSERT INTO projects (id, name, description, start_date, end_date, sprint_planning, include_in_status_report, include_in_master_timeline, default_notify_enabled, created_by_id)
+                     VALUES (:id, :name, :description, :start_date, :end_date, :sprint_planning, :include_in_status_report, :include_in_master_timeline, :default_notify_enabled, :created_by_id)'
                 );
                 $stmt->execute([
                     'id' => $id,
@@ -113,6 +115,7 @@ class ProjectRoutes
                     'end_date' => Validator::toMySQLDate($data['endDate'] ?? null),
                     'sprint_planning' => (int) ($data['sprintPlanning'] ?? true),
                     'include_in_status_report' => (int) ($data['includeInStatusReport'] ?? true),
+                    'include_in_master_timeline' => (int) ($data['includeInMasterTimeline'] ?? true),
                     'default_notify_enabled' => (int) ($data['defaultNotifyEnabled'] ?? true),
                     'created_by_id' => $userId,
                 ]);
@@ -149,6 +152,7 @@ class ProjectRoutes
                     'endDate' => 'optional|nullable|iso8601',
                     'sprintPlanning' => 'optional|boolean',
                     'includeInStatusReport' => 'optional|boolean',
+                    'includeInMasterTimeline' => 'optional|boolean',
                     'defaultNotifyEnabled' => 'optional|boolean',
                 ]);
 
@@ -210,6 +214,10 @@ class ProjectRoutes
                 if (array_key_exists('includeInStatusReport', $data)) {
                     $updates[] = 'include_in_status_report = :include_in_status_report';
                     $params['include_in_status_report'] = (int) (bool) $data['includeInStatusReport'];
+                }
+                if (array_key_exists('includeInMasterTimeline', $data)) {
+                    $updates[] = 'include_in_master_timeline = :include_in_master_timeline';
+                    $params['include_in_master_timeline'] = (int) (bool) $data['includeInMasterTimeline'];
                 }
                 if (array_key_exists('defaultNotifyEnabled', $data)) {
                     // Not retroactive (PRD §9.3): only seeds future task creation.

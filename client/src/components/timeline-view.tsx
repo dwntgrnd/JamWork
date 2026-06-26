@@ -188,8 +188,18 @@ const TimelineViewComponent = ({ projectId, filters, refreshKey }: TimelineViewP
     }
   };
 
+  // On the all-projects (master) timeline, drop tasks whose project has opted
+  // out via project settings. Scoped to global mode — a project's own Timeline
+  // tab always shows its tasks regardless of the flag.
+  const masterTimelineExcluded = new Set(
+    projects.filter((p) => p.includeInMasterTimeline === false).map((p) => p.id)
+  );
+
   // Apply filters to tasks
   const filteredTasks = tasks.filter((task) => {
+    // Master-timeline opt-out (global view only)
+    if (!projectId && task.projectId && masterTimelineExcluded.has(task.projectId)) return false;
+
     // Status filter
     if (filters?.status && task.status !== filters.status) return false;
 
