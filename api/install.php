@@ -870,6 +870,7 @@ ENV;
             __DIR__ . '/migrations/010_task_visibility_controls.sql',
             __DIR__ . '/migrations/011_report_project_filter.sql',
             __DIR__ . '/migrations/012_user_preferences.sql',
+            __DIR__ . '/migrations/013_project_master_timeline.sql',
         ];
 
         foreach ($migrations as $file) {

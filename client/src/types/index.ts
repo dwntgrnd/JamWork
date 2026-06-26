@@ -61,6 +61,7 @@ export interface Project {
   sprintPlanning?: boolean;
   defaultNotifyEnabled?: boolean;
   includeInStatusReport?: boolean;
+  includeInMasterTimeline?: boolean;
   createdById: string;
   createdAt: Date | string;
   updatedAt: Date | string;
