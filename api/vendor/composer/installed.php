@@ -3,11 +3,11 @@
         'name' => 'jamwork/api',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '6ca153f26a75d6e4ee07f95d80161fa46bc48393',
+        'reference' => '94161ef9a5c82ea971c8aad4bb35770ed2d60506',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
-        'dev' => true,
+        'dev' => false,
     ),
     'versions' => array(
         'brick/math' => array(
@@ -49,7 +49,7 @@
         'jamwork/api' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '6ca153f26a75d6e4ee07f95d80161fa46bc48393',
+            'reference' => '94161ef9a5c82ea971c8aad4bb35770ed2d60506',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
@@ -191,9 +191,9 @@
             'dev_requirement' => false,
         ),
         'slim/slim' => array(
-            'pretty_version' => '4.15.1',
-            'version' => '4.15.1.0',
-            'reference' => '887893516557506f254d950425ce7f5387a26970',
+            'pretty_version' => '4.15.2',
+            'version' => '4.15.2.0',
+            'reference' => 'e12cb05ca2a14e8f459d019e87a31dc915b80470',
             'type' => 'library',
             'install_path' => __DIR__ . '/../slim/slim',
             'aliases' => array(),
