@@ -46,6 +46,19 @@ export function formatDate(dateStr?: string | Date): string {
 }
 
 /**
+ * Coerces a value to the "YYYY-MM-DD" string a native date input expects.
+ * Returns "" for empty or unparseable dates rather than throwing — a single
+ * bad date (e.g. a server zero-date serialized as "-001-...") must never crash
+ * the row it renders in.
+ */
+export function toInputValue(value?: string | Date | null): string {
+  if (!value) return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+}
+
+/**
  * Checks if a date is overdue (before today and task is not done).
  * @param dateStr - Date string or Date object
  * @param taskStatus - Task status (optional)

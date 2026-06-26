@@ -60,6 +60,24 @@ final class ValidatorTest extends TestCase
         $this->assertNotEmpty(Validator::validate(['ids' => 'not-an-array'], $rules));
     }
 
+    public function testToIso8601ReturnsNullForNullEmptyAndZeroDates(): void
+    {
+        // The production incident: a MySQL zero-date is non-empty (truthy), so the
+        // old `date('c', strtotime($v))` emitted '-001-11-30T...' (year -001), an
+        // invalid JS Date that crashed the client list render. These must be null.
+        $this->assertNull(Validator::toIso8601(null));
+        $this->assertNull(Validator::toIso8601(''));
+        $this->assertNull(Validator::toIso8601('0000-00-00 00:00:00'));
+        $this->assertNull(Validator::toIso8601('0000-00-00'));
+        $this->assertNull(Validator::toIso8601('not a date'));
+    }
+
+    public function testToIso8601FormatsValidDates(): void
+    {
+        $this->assertStringStartsWith('2026-06-15T', Validator::toIso8601('2026-06-15 00:00:00'));
+        $this->assertStringStartsWith('2026-06-15T', Validator::toIso8601('2026-06-15'));
+    }
+
     public function testRespondWithErrorsIncludesTopLevelErrorKey(): void
     {
         $factory = new \Slim\Psr7\Factory\ResponseFactory();

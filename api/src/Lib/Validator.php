@@ -215,6 +215,26 @@ class Validator
         return $dt->format('Y-m-d H:i:s');
     }
 
+    /**
+     * Format a MySQL date/timestamp string as ISO 8601 for API responses, or
+     * null when there is effectively no date. Guards against MySQL zero-dates
+     * ('0000-00-00'): they are non-empty (truthy) yet strtotime() yields a
+     * year <= 0 that `date('c', ...)` renders as '-001-11-30T...', which is an
+     * invalid JS Date and crashed the client. Both unparseable input and
+     * out-of-range years collapse to null.
+     */
+    public static function toIso8601(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $ts = strtotime($value);
+        if ($ts === false || (int) date('Y', $ts) < 1) {
+            return null;
+        }
+        return date('c', $ts);
+    }
+
     private static function ruleUuidArray(string $field, mixed $value): ?array
     {
         if ($value === null) {

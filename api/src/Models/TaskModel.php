@@ -3,6 +3,7 @@
 namespace JamWork\Models;
 
 use JamWork\Lib\Database;
+use JamWork\Lib\Validator;
 
 class TaskModel
 {
@@ -57,8 +58,8 @@ class TaskModel
             'status' => $row['status'],
             'priority' => $row['priority'],
             'effort' => $row['effort'] !== null ? (int) $row['effort'] : null,
-            'dueDate' => $row['due_date'] ? date('c', strtotime($row['due_date'])) : null,
-            'startDate' => $row['start_date'] ? date('c', strtotime($row['start_date'])) : null,
+            'dueDate' => Validator::toIso8601($row['due_date']),
+            'startDate' => Validator::toIso8601($row['start_date']),
             'sortOrder' => (int) $row['sort_order'],
             'recurrence' => $row['recurrence'],
             'sprintId' => $row['sprint_id'],
