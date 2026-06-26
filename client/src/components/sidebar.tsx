@@ -56,9 +56,17 @@ interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
   onNavigate?: () => void;
+  /** Enable drag-to-resize on the right edge (desktop only). */
+  resizable?: boolean;
 }
 
-export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
+// Expanded-width bounds for the resizable sidebar. Default matches the former
+// fixed w-64 (256px); width is in-memory only, so it resets to default on refresh.
+const DEFAULT_WIDTH = 256;
+const MIN_WIDTH = 208;
+const MAX_WIDTH = 480;
+
+export function Sidebar({ collapsed, onToggle, onNavigate, resizable = false }: SidebarProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { data: projects = [], isLoading: loading } = useProjects();
@@ -77,6 +85,52 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   const view = sidebarPrefs?.view ?? 'all';
   const pinnedProjects = sidebarPrefs?.pinnedProjects ?? [];
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Drag-to-resize (desktop, expanded only). Width is component state so it
+  // persists across in-app navigation but resets to default on a full refresh.
+  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const handleResizeStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = width;
+    setIsResizing(true);
+    const onMove = (ev: PointerEvent) => {
+      const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + (ev.clientX - startX)));
+      setWidth(next);
+    };
+    const onUp = () => {
+      setIsResizing(false);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.style.removeProperty('cursor');
+      document.body.style.removeProperty('user-select');
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  const handleResizeKey = (e: React.KeyboardEvent) => {
+    const STEP = 16;
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setWidth((w) => Math.max(MIN_WIDTH, w - STEP));
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      setWidth((w) => Math.min(MAX_WIDTH, w + STEP));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setWidth(MIN_WIDTH);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setWidth(MAX_WIDTH);
+    }
+  };
+
+  const showResizeHandle = resizable && !collapsed;
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) {
@@ -157,9 +211,11 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
       <TooltipProvider>
         <nav
           className={cn(
-            'flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-200',
-            collapsed ? 'w-16' : 'w-64'
+            'relative flex flex-col h-full bg-sidebar border-r border-sidebar-border',
+            !isResizing && 'transition-all duration-200',
+            collapsed ? 'w-16' : !resizable && 'w-64'
           )}
+          style={resizable && !collapsed ? { width } : undefined}
           aria-label="Main navigation"
         >
           {/* Toggle button */}
@@ -542,6 +598,33 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
                   />
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Drag-to-resize handle on the right edge. Straddles the seam with
+              the content area; keyboard-operable via the separator role. */}
+          {showResizeHandle && (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize sidebar"
+              aria-valuenow={width}
+              aria-valuemin={MIN_WIDTH}
+              aria-valuemax={MAX_WIDTH}
+              tabIndex={0}
+              onPointerDown={handleResizeStart}
+              onKeyDown={handleResizeKey}
+              onDoubleClick={() => setWidth(DEFAULT_WIDTH)}
+              className="group/resize absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize focus-visible:outline-none"
+            >
+              <div
+                className={cn(
+                  'mx-auto h-full w-px transition-colors',
+                  isResizing
+                    ? 'bg-ring'
+                    : 'bg-transparent group-hover/resize:bg-sidebar-border group-focus-visible/resize:bg-ring'
+                )}
+              />
             </div>
           )}
         </nav>

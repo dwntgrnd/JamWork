@@ -179,6 +179,7 @@ export default function ProtectedLayout() {
           <Sidebar
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+            resizable
           />
         </div>
 
