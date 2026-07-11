@@ -40,6 +40,12 @@ const groupTasksByProject = (tasks: (Task & { project?: { id: string; name: stri
 interface SprintCardProps {
   sprint: SprintWithTasks;
   isActive: boolean;
+  /** Active sprint that hasn't started yet — shows a "Starts …" not-yet-started hint. */
+  isFuture?: boolean;
+  /** Active sprint whose end date has passed (day-level) but wasn't closed. */
+  isOverdue?: boolean;
+  /** Whole days since the end date; drives the "Ended …" wording. */
+  daysOverdue?: number;
   isExpanded: boolean;
   moveTargets: SprintWithTasks[];
   onToggleExpand: (id: string) => void;
@@ -54,6 +60,9 @@ interface SprintCardProps {
 export function SprintCard({
   sprint,
   isActive,
+  isFuture = false,
+  isOverdue = false,
+  daysOverdue = 0,
   isExpanded,
   moveTargets,
   onToggleExpand,
@@ -97,6 +106,16 @@ export function SprintCard({
                 Completed
               </span>
             )}
+            {isOverdue && (
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-urgency-overdue/10 text-urgency-overdue font-medium whitespace-nowrap flex-shrink-0">
+                {daysOverdue === 1 ? 'Ended yesterday' : `Ended ${daysOverdue} days ago`}
+              </span>
+            )}
+            {isFuture && (
+              <span className="text-[11px] text-muted-foreground font-medium whitespace-nowrap flex-shrink-0">
+                Starts {formatDate(sprint.startDate)}
+              </span>
+            )}
             {sprint.project && (
               <span className="text-xs text-muted-foreground truncate flex-shrink-0">
                 {sprint.project.name}
@@ -114,7 +133,10 @@ export function SprintCard({
             </button>
             {isActive && onClose && (
               <button
-                className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-success/10 text-success hover:bg-success/20 flex-shrink-0"
+                className={cn(
+                  'inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-success/10 text-success hover:bg-success/20 flex-shrink-0',
+                  !isOverdue && 'opacity-0 group-hover:opacity-100 transition-opacity',
+                )}
                 onClick={(e) => {
                   e.stopPropagation();
                   onClose(sprint);
