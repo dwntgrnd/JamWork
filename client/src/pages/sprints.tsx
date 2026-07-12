@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiGet, apiPost, apiPut, getErrorMessage } from '@/lib/api';
 import { Sprint, Task, Project, UserSummary, STATUS_LABELS, PRIORITY_LABELS } from '@/types';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,8 @@ import {
 } from '@/components/sprint-dialogs';
 
 import { getAvatarColor } from '@/lib/style-tokens';
+import { startOfLocalDay } from '@/lib/date-utils';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 // Priority sort order
 const PRIORITY_ORDER: Record<string, number> = {
@@ -102,6 +104,22 @@ export default function GlobalSprintsPage() {
   useEffect(() => {
     setSelectedTaskIds(new Set());
   }, [backlogFilters, backlogSortBy, backlogSortDir]);
+
+  // Auto-expand the running sprint(s) once, after the first data load. Seeds
+  // initial view state without locking it: later refreshes and user toggles are
+  // preserved because the ref gate prevents re-seeding.
+  const didSeedExpansion = useRef(false);
+  useEffect(() => {
+    if (loading || didSeedExpansion.current || sprints.length === 0) return;
+    const t = startOfLocalDay();
+    const runningIds = sprints
+      .filter((s) => s.status === 'active' && startOfLocalDay(s.startDate) <= t && startOfLocalDay(s.endDate) >= t)
+      .map((s) => s.id);
+    if (runningIds.length > 0) {
+      setExpandedSprintIds((prev) => new Set([...prev, ...runningIds]));
+    }
+    didSeedExpansion.current = true;
+  }, [loading, sprints]);
 
   const fetchAllData = async () => {
     try {
@@ -302,14 +320,18 @@ export default function GlobalSprintsPage() {
   // Sort active sprints by startDate ascending
   activeSprints.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
-  // Categorize active sprints into current (in progress) and future (upcoming)
-  const now = new Date();
-  const currentSprints = activeSprints.filter((s) => new Date(s.startDate) <= now && new Date(s.endDate) >= now);
-  const futureSprints = activeSprints.filter((s) => new Date(s.startDate) > now);
+  // Categorize active sprints into current (in progress), future (upcoming), and
+  // past (ended but never closed). Comparisons are day-level: a sprint ending
+  // today counts as running, and only flips to "ended" the day after its end
+  // date — never at an arbitrary time on its final day.
+  const today = startOfLocalDay();
+  const currentSprints = activeSprints.filter((s) => startOfLocalDay(s.startDate) <= today && startOfLocalDay(s.endDate) >= today);
+  const futureSprints = activeSprints.filter((s) => startOfLocalDay(s.startDate) > today);
   // Active sprints whose end date has passed but that were never closed. They're
   // still assignable (the task drawer offers them); without this group they'd be
   // dropped from the assign dropdowns entirely — neither "current" nor "upcoming".
-  const pastSprints = activeSprints.filter((s) => new Date(s.endDate) < now);
+  // This is also the overdue set surfaced on the Active tab.
+  const pastSprints = activeSprints.filter((s) => startOfLocalDay(s.endDate) < today);
 
   // Apply filters to backlog tasks
   const filteredBacklog = backlogTasks.filter((task) => {
@@ -393,9 +415,6 @@ export default function GlobalSprintsPage() {
     );
   }
 
-  // Show backlog even when no sprints exist
-  const showNoSprintsMessage = sprints.length === 0;
-
   return (
     <>
     <div className="p-4 sm:p-6 lg:p-8">
@@ -413,79 +432,97 @@ export default function GlobalSprintsPage() {
           <p className="text-sm text-muted-foreground mt-1">Across all projects</p>
         </div>
 
-        {/* Active Sprints Zone - elevated container */}
+        {/* Sprints Zone - elevated container, tab-split into Active / Completed */}
         <div className="bg-card border border-border shadow-sm rounded-lg sm:rounded-xl mb-8">
-          {/* Sticky header */}
-          <div className="sticky top-[65px] z-20 bg-card border-b border-border rounded-t-lg sm:rounded-t-xl px-4 sm:px-5 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-semibold text-foreground">Active Sprints</h3>
-                <span className="text-sm text-muted-foreground">
-                  &middot; {activeSprints.length + completedSprints.length}
-                </span>
+          <Tabs defaultValue="active">
+            {/* Sticky header: tab list + New Sprint */}
+            <div className="sticky top-[65px] z-20 bg-card border-b border-border rounded-t-lg sm:rounded-t-xl px-4 sm:px-5 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <TabsList>
+                  <TabsTrigger value="active">
+                    Active <span className="text-muted-foreground">&middot; {activeSprints.length}</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="completed">
+                    Completed <span className="text-muted-foreground">&middot; {completedSprints.length}</span>
+                  </TabsTrigger>
+                </TabsList>
+                <Button variant="emphasis" className="rounded-lg px-5 gap-2 font-semibold" onClick={handleOpenCreateDialog}>
+                  <Plus className="h-4 w-4" />
+                  New Sprint
+                </Button>
               </div>
-              <Button variant="emphasis" className="rounded-lg px-5 gap-2 font-semibold" onClick={handleOpenCreateDialog}>
-                <Plus className="h-4 w-4" />
-                New Sprint
-              </Button>
             </div>
-          </div>
 
-          {/* Sprint content */}
-          <div className="p-4 sm:p-5 space-y-2">
-              {/* No Sprints Message */}
-              {showNoSprintsMessage ? (
+            {/* Active tab — running (auto-expanded) → overdue → future (collapsed) */}
+            <TabsContent value="active" className="p-4 sm:p-5 space-y-2">
+              {activeSprints.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <Calendar className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <h4 className="text-lg font-medium text-foreground mb-1">No sprints found</h4>
-                  <p className="text-sm text-muted-foreground max-w-sm">
-                    Create your first sprint to start planning your work.
+                  <h4 className="text-lg font-medium text-foreground mb-1">No active sprint</h4>
+                  <p className="text-sm text-muted-foreground max-w-sm mb-4">
+                    Create a sprint to start planning your team's week.
                   </p>
+                  <Button variant="emphasis" className="rounded-lg px-5 gap-2 font-semibold" onClick={handleOpenCreateDialog}>
+                    <Plus className="h-4 w-4" />
+                    New Sprint
+                  </Button>
                 </div>
               ) : (
-                <>
-                  {/* Active Sprint Cards */}
-                  {activeSprints.map((sprint) => (
-                    <SprintCard
-                      key={sprint.id}
-                      sprint={sprint}
-                      isActive
-                      isExpanded={expandedSprintIds.has(sprint.id)}
-                      moveTargets={activeSprints.filter((s) => s.id !== sprint.id)}
-                      onToggleExpand={toggleSprintExpanded}
-                      onEdit={handleOpenEditDialog}
-                      onClose={handleOpenCloseDialog}
-                      onAddTask={handleOpenTaskDrawer}
-                      onMoveTask={handleMoveTask}
-                      onTaskClick={setEditingTask}
-                    />
-                  ))}
-
-              {/* Completed Sprints - if any */}
-              {completedSprints.length > 0 && (
-                <>
-                  <div className="pt-6 mt-6 border-t border-border">
-                    <h4 className="text-sm font-medium text-muted-foreground mb-3">Completed</h4>
-                  </div>
-                  {completedSprints.map((sprint) => (
-                    <SprintCard
-                      key={sprint.id}
-                      sprint={sprint}
-                      isActive={false}
-                      isExpanded={expandedSprintIds.has(sprint.id)}
-                      moveTargets={activeSprints.filter((s) => s.id !== sprint.id)}
-                      onToggleExpand={toggleSprintExpanded}
-                      onEdit={handleOpenEditDialog}
-                      onMoveTask={handleMoveTask}
-                      onTaskClick={setEditingTask}
-                    />
-                  ))}
-                </>
+                [
+                  ...currentSprints.map((s) => ({ sprint: s, isFuture: false, isOverdue: false, daysOverdue: 0 })),
+                  ...pastSprints.map((s) => ({
+                    sprint: s,
+                    isFuture: false,
+                    isOverdue: true,
+                    daysOverdue: Math.round((today.getTime() - startOfLocalDay(s.endDate).getTime()) / 86_400_000),
+                  })),
+                  ...futureSprints.map((s) => ({ sprint: s, isFuture: true, isOverdue: false, daysOverdue: 0 })),
+                ].map(({ sprint, isFuture, isOverdue, daysOverdue }) => (
+                  <SprintCard
+                    key={sprint.id}
+                    sprint={sprint}
+                    isActive
+                    isFuture={isFuture}
+                    isOverdue={isOverdue}
+                    daysOverdue={daysOverdue}
+                    isExpanded={expandedSprintIds.has(sprint.id)}
+                    moveTargets={activeSprints.filter((s) => s.id !== sprint.id)}
+                    onToggleExpand={toggleSprintExpanded}
+                    onEdit={handleOpenEditDialog}
+                    onClose={handleOpenCloseDialog}
+                    onAddTask={handleOpenTaskDrawer}
+                    onMoveTask={handleMoveTask}
+                    onTaskClick={setEditingTask}
+                  />
+                ))
               )}
-            </>
-          )}
+            </TabsContent>
+
+            {/* Completed tab */}
+            <TabsContent value="completed" className="p-4 sm:p-5 space-y-2">
+              {completedSprints.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Calendar className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <h4 className="text-lg font-medium text-foreground mb-1">No completed sprints</h4>
+                </div>
+              ) : (
+                completedSprints.map((sprint) => (
+                  <SprintCard
+                    key={sprint.id}
+                    sprint={sprint}
+                    isActive={false}
+                    isExpanded={expandedSprintIds.has(sprint.id)}
+                    moveTargets={activeSprints.filter((s) => s.id !== sprint.id)}
+                    onToggleExpand={toggleSprintExpanded}
+                    onEdit={handleOpenEditDialog}
+                    onMoveTask={handleMoveTask}
+                    onTaskClick={setEditingTask}
+                  />
+                ))
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
-      </div>
 
         {/* Backlog Zone - flat, no elevation */}
         <div className="mb-8">
